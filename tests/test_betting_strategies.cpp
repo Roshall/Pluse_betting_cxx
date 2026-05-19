@@ -7,6 +7,8 @@
 #include "betting_by_time/strategies/vanilla_betting.hpp"
 #include "betting_by_time/strategies/adaptive_betting.hpp"
 #include "betting_by_time/framework.hpp"
+#include <stdexcept>
+#include <typeinfo>
 #include <random>
 
 using namespace betting;
@@ -120,10 +122,8 @@ TEST_CASE("Framework API - vanilla geo factory", "[framework][vanilla]") {
     
     auto gambler = make_gambler(0.05f, 0.5f, 100);
     
-    // Type check
-    STATIC_REQUIRE(std::is_same_v<decltype(gambler), GeoCheckingCapital>);
+    REQUIRE(gambler.type() == typeid(GeoCheckingCapital));
     
-    // Test betting function
     Vector32f samples = generate_binomial_samples(0.6f, 100);
     auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, gambler);
     
@@ -137,10 +137,8 @@ TEST_CASE("Framework API - vanilla seq factory", "[framework][vanilla]") {
     
     auto gambler = make_gambler(0.05f, 0.5f, 100);
     
-    // Type check
-    STATIC_REQUIRE(std::is_same_v<decltype(gambler), SequenceCheckingCapital>);
+    REQUIRE(gambler.type() == typeid(SequenceCheckingCapital));
     
-    // Test betting function
     Vector32f samples = generate_binomial_samples(0.4f, 100);
     auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, gambler);
     
@@ -150,13 +148,13 @@ TEST_CASE("Framework API - vanilla seq factory", "[framework][vanilla]") {
 }
 
 TEST_CASE("Framework API - adaptive geo factory", "[framework][adaptive]") {
-    // TODO: Fix framework.hpp return type consistency
-    // auto [make_gambler, bet_fn] = adaptive_geo_factory();
+    auto [make_gambler, bet_fn] = adaptive_geo_factory();
     
-    // For now, test directly
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    auto gambler = make_gambler(0.05f, 0.5f, 100);
+    REQUIRE(gambler.type() == typeid(GeoCheckingCapital));
+
     Vector32f samples = generate_binomial_samples(0.7f, 150);
-    auto [est, used] = adaptive_betting(samples, 0.5f, 0.1f, 100, gambler);
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, gambler);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -164,10 +162,13 @@ TEST_CASE("Framework API - adaptive geo factory", "[framework][adaptive]") {
 }
 
 TEST_CASE("Framework API - adaptive seq factory", "[framework][adaptive]") {
-    // TODO: Fix framework.hpp return type consistency
-    SequenceCheckingCapital gambler(0.05f, 0.5f, 100);
+    auto [make_gambler, bet_fn] = adaptive_seq_factory();
+
+    auto gambler = make_gambler(0.05f, 0.5f, 100);
+    REQUIRE(gambler.type() == typeid(SequenceCheckingCapital));
+
     Vector32f samples = generate_binomial_samples(0.3f, 150);
-    auto [est, used] = adaptive_betting(samples, 0.5f, 0.1f, 100, gambler);
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, gambler);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -175,23 +176,73 @@ TEST_CASE("Framework API - adaptive seq factory", "[framework][adaptive]") {
 }
 
 TEST_CASE("Generic betting factory", "[framework]") {
-    // Test vanilla combinations only (adaptive has return type issues)
-    auto strategies = {BetStrategy::Vanilla};
-    auto capital_types = {CapitalType::Geo};  // Only Geo is fully implemented
-    
-    for (auto strategy : strategies) {
-        for (auto cap_type : capital_types) {
-            auto [make_gambler, bet_fn] = betting_factory(strategy, cap_type);
-            
-            auto gambler = make_gambler(0.05f, 0.5f, 50);
-            Vector32f samples = generate_binomial_samples(0.5f, 50);
-            auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
-            
-            REQUIRE(est >= 0.0f);
-            REQUIRE(est <= 1.0f);
-            REQUIRE(used > 0);
-        }
+    SECTION("Vanilla Geo") {
+        auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Vanilla, CapitalType::Geo);
+        auto gambler = make_gambler(0.05f, 0.5f, 50);
+
+        REQUIRE(gambler.type() == typeid(GeoCheckingCapital));
+
+        Vector32f samples = generate_binomial_samples(0.5f, 50);
+        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
+
+        REQUIRE(est >= 0.0f);
+        REQUIRE(est <= 1.0f);
+        REQUIRE(used > 0);
     }
+
+    SECTION("Vanilla Seq") {
+        auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Vanilla, CapitalType::Seq);
+        auto gambler = make_gambler(0.05f, 0.5f, 50);
+
+        REQUIRE(gambler.type() == typeid(SequenceCheckingCapital));
+
+        Vector32f samples = generate_binomial_samples(0.5f, 50);
+        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
+
+        REQUIRE(est >= 0.0f);
+        REQUIRE(est <= 1.0f);
+        REQUIRE(used > 0);
+    }
+
+    SECTION("Adaptive Geo") {
+        auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Ada, CapitalType::Geo);
+        auto gambler = make_gambler(0.05f, 0.5f, 50);
+
+        REQUIRE(gambler.type() == typeid(GeoCheckingCapital));
+
+        Vector32f samples = generate_binomial_samples(0.5f, 50);
+        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
+
+        REQUIRE(est >= 0.0f);
+        REQUIRE(est <= 1.0f);
+        REQUIRE(used > 0);
+    }
+
+    SECTION("Adaptive Seq") {
+        auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Ada, CapitalType::Seq);
+        auto gambler = make_gambler(0.05f, 0.5f, 50);
+
+        REQUIRE(gambler.type() == typeid(SequenceCheckingCapital));
+
+        Vector32f samples = generate_binomial_samples(0.5f, 50);
+        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
+
+        REQUIRE(est >= 0.0f);
+        REQUIRE(est <= 1.0f);
+        REQUIRE(used > 0);
+    }
+}
+
+TEST_CASE("Betting factory rejects unsupported enum values", "[framework]") {
+    REQUIRE_THROWS_AS(
+        betting_factory(static_cast<BetStrategy>(99), CapitalType::Geo),
+        std::invalid_argument
+    );
+
+    REQUIRE_THROWS_AS(
+        betting_factory(BetStrategy::Vanilla, static_cast<CapitalType>(99)),
+        std::invalid_argument
+    );
 }
 
 TEST_CASE("Betting strategies handle edge cases", "[strategy]") {
