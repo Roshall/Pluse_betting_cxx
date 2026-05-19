@@ -22,7 +22,7 @@ namespace betting {
  */
 template<typename CapitalProcess>
 std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
-                                           Float32 prior_mean,
+                                           [[maybe_unused]] Float32 prior_mean,
                                            Float32 delta,
                                            Int32 grid_num,
                                            CapitalProcess& gambler) {
