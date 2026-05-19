@@ -23,7 +23,7 @@ include(FetchContent)
 FetchContent_Declare(
   Catch2
   GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG v3.4.0
+  GIT_TAG v3.15.0
 )
 FetchContent_MakeAvailable(Catch2)
 
@@ -31,7 +31,7 @@ FetchContent_MakeAvailable(Catch2)
 FetchContent_Declare(
   eigen
   GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-  GIT_TAG 3.4.0
+  GIT_TAG 5.0.0
 )
 FetchContent_MakeAvailable(eigen)
 
@@ -67,5 +67,5 @@ target_compile_definitions(betting_by_time PRIVATE
 
 # Add subdirectories
 add_subdirectory(tests)
-# add_subdirectory(benchmarks)  # Temporarily disabled - benchmarks not yet implemented
+add_subdirectory(benchmarks)
 add_subdirectory(examples)
