@@ -7,9 +7,24 @@
 #include "betting_by_time/capital/sequence_checking.hpp"
 #include <cmath>
 #include <algorithm>
-#include <limits>
 
 namespace betting {
+
+// Touch flags for adaptive betting direction detection
+enum class Touch : Int32 { None = 0, Lower = 1, Upper = 2, Both = 3 };
+
+inline Touch operator|(Touch a, Touch b) {
+    return static_cast<Touch>(static_cast<Int32>(a) | static_cast<Int32>(b));
+}
+
+inline Touch& operator|=(Touch& a, Touch b) {
+    a = a | b;
+    return a;
+}
+
+inline Touch operator&(Touch a, Touch b) {
+    return static_cast<Touch>(static_cast<Int32>(a) & static_cast<Int32>(b));
+}
 
 /**
  * @brief Adaptive betting strategy with dynamic confidence interval refinement.
@@ -38,7 +53,6 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
                                             CapitalProcess& gambler) {
     // Initialize parameters
     Float32 stride = 1.0f / static_cast<Float32>(grid_num);
-    Float32 threshold = gambler.threshold() * 2.0f;
     
     // Initial confidence interval around prior
     Float32 l = std::max(0.0f, prior_mean - delta);
@@ -49,7 +63,7 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
     Int32 ui = static_cast<Int32>(std::round(u * grid_num));
     
     // Touch flags: bit 0 = lower touched, bit 1 = upper touched
-    Int32 touch = 0;
+    Touch touch = Touch::None;
     
     // Phase 1: Detect direction by advancing until one boundary is touched
     Int32 i = 0;
@@ -57,22 +71,22 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
         gambler.add_sample(samples(i++));
         
         // Test if we've touched either boundary
-        if (!(touch & 1)) {
+        if ((touch & Touch::Lower) == Touch::None) {
             // Check lower bound
             if (bet_on(gambler, l, li, 0)) {
-                touch |= 1;  // Mark lower as touched
+                touch |= Touch::Lower;  // Mark lower as touched
             }
         }
-        
-        if (!(touch & 2)) {
+
+        if ((touch & Touch::Upper) == Touch::None) {
             // Check upper bound
             if (bet_on(gambler, u, ui, 1)) {
-                touch |= 2;  // Mark upper as touched
+                touch |= Touch::Upper;  // Mark upper as touched
             }
         }
         
         // If both touched or one touched, we can proceed
-        if (touch != 0) {
+        if (touch != Touch::None) {
             break;
         }
     }
@@ -84,7 +98,7 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
     }
     
     // Phase 2: Refine bounds based on which direction was detected
-    if (touch == 1) {
+    if (touch == Touch::Lower) {
         // Only lower bound touched - need to find new lower bound
         
         // Binary search for lower bound
@@ -119,7 +133,7 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
         // Update lower bound
         l = ui * stride;
         
-    } else if (touch == 2) {
+    } else if (touch == Touch::Upper) {
         // Only upper bound touched - need to find new upper bound
         
         // Binary search for upper bound
@@ -154,7 +168,7 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
         // Update upper bound
         u = li * stride;
         
-    } else if (touch == 3) {
+    } else if (touch == Touch::Both) {
         // Both bounds touched - interval is already tight
         // Could perform additional refinement here if needed
     }
