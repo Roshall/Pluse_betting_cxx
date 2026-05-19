@@ -1,12 +1,11 @@
 /**
  * @file basic_usage.cpp
  * @brief Example demonstrating the framework API usage
-#include <chrono>
  */
 
 #include "betting_by_time/framework.hpp"
+#include "betting_by_time/capital/geo_checking.hpp"
 #include <iostream>
-#include <chrono>
 #include <random>
 
 using namespace betting;

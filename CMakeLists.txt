@@ -38,11 +38,11 @@ FetchContent_MakeAvailable(eigen)
 # Create main library target
 add_library(betting_by_time STATIC
     src/utilities.cpp
-    src/geo_checking.cpp
-    src/sequence_checking.cpp
-    src/bet_once.cpp
-    src/vanilla_betting.cpp
-    src/adaptive_betting.cpp
+    include/betting_by_time/capital/geo_checking.hpp
+    include/betting_by_time/capital/sequence_checking.hpp
+    include/betting_by_time/bet_once.hpp
+    include/betting_by_time/strategies/vanilla_betting.hpp
+    include/betting_by_time/strategies/adaptive_betting.hpp
     src/framework.cpp
 )
 

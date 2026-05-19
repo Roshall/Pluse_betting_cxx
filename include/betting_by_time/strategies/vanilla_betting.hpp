@@ -3,7 +3,6 @@
 
 #include "betting_by_time/core/types.hpp"
 #include "betting_by_time/core/utilities.hpp"
-#include "betting_by_time/capital/geo_checking.hpp"
 
 namespace betting {
 

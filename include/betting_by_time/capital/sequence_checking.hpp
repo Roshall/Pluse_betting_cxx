@@ -3,7 +3,6 @@
 
 #include "betting_by_time/core/types.hpp"
 #include "betting_by_time/capital/sequence_lambda.hpp"
-#include "betting_by_time/bet_once.hpp"
 #include <Eigen/Dense>
 
 namespace betting {
