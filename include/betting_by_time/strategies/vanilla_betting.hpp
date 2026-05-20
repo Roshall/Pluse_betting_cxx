@@ -46,7 +46,9 @@ public:
     }
 
     void submit_sample(Float32 sample) {
-        submit_samples(Vector32f(sample));
+        Vector32f sample_vec(1);
+        sample_vec(0) = sample;
+        submit_samples(sample_vec);
     }
 
     void submit_samples(const Vector32f& samples) {

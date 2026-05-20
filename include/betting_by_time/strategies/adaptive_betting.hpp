@@ -73,7 +73,9 @@ public:
      * @param sample The sample to process
      */
     void submit_sample(Float32 sample) {
-        submit_samples(Vector32f(sample));
+        Vector32f sample_vec(1);
+        sample_vec(0) = sample;
+        submit_samples(sample_vec);
     }
 
     /**
@@ -92,7 +94,6 @@ public:
 
         // Add all samples to the gambler in batch
         gambler_.add_sample(samples);
-        
         switch (phase_) {
             case Phase::DirectionDetection:
                 process_direction_detection();
