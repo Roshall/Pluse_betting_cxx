@@ -131,6 +131,17 @@ public:
     }
 
     /**
+     * @brief Add a batch of samples to the process.
+     * 
+     * @param samples Sample batch
+     */
+    void add_sample(const Vector32f& samples) {
+        for (Int32 i = 0; i < samples.size(); ++i) {
+            add_sample(samples(i));
+        }
+    }
+
+    /**
      * @brief Advance the capital process with a new sample across multiple hypotheses.
      * 
      * @param x New sample value
