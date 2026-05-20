@@ -4,6 +4,7 @@
 #include "betting_by_time/core/types.hpp"
 #include "betting_by_time/core/utilities.hpp"
 #include <cmath>
+#include <Eigen/Dense>
 
 namespace betting {
 
@@ -79,18 +80,15 @@ public:
         t_ += n;
         Int32 t = t_;
         
-        // Update cumulative statistics
-        Float32 sum = 0.0f;
-        for (Int32 i = 0; i < n; ++i) {
-            sum += samples[i];
-        }
+        // Update cumulative statistics using Eigen
+        Eigen::Map<const Eigen::VectorXf> sample_vec(samples, n);
+        Float32 sum = sample_vec.sum();
         cum_ += sum;
         
-        // Update cumulative squared differences
+        // Update cumulative squared differences using Eigen
         Float32 mean = cum_ / t;
-        for (Int32 i = 0; i < n; ++i) {
-            cum_diff2_ += (samples[i] - mean) * (samples[i] - mean);
-        }
+        Eigen::VectorXf centered = sample_vec.array() - mean;
+        cum_diff2_ += centered.squaredNorm();
         
         // Compute optimal lambda
         Float32 sigma2 = cum_diff2_ / t;
