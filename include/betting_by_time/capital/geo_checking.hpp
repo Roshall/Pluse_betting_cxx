@@ -113,12 +113,23 @@ public:
      * 
      * @param samples Sample value
      */
-    void add_sample(Float32 samples) {
+    void add_sample(Float32 sample) {
+        Vector32f sample_batch(1);
+        sample_batch(0) = sample;
+        add_sample(sample_batch);
+    }
+
+    /**
+     * @brief Add a batch of samples to the process.
+     * 
+     * @param samples Sample batch
+     */
+    void add_sample(const Vector32f& samples) {
         Int32 start = s_pos_(s_ptr_);
-        samples_(start) = samples;
-        capitals_(s_ptr_) = cap_mine_.advance(&samples_(start), 1);
+        samples_.segment(start, samples.size()) = samples;
+        capitals_(s_ptr_) = cap_mine_.advance(&samples_(start), samples.size());
         s_ptr_ += 1;
-        s_pos_(s_ptr_) = start + 1;
+        s_pos_(s_ptr_) = start + static_cast<Int32>(samples.size());
     }
 
     /**
@@ -145,7 +156,19 @@ public:
      * @param samples New sample value
      * @param m_lst Vector of hypothesized means to test
      */
-    void advance(Float32 samples, const Vector32f& m_lst) {
+    void advance(Float32 sample, const Vector32f& m_lst) {
+        Vector32f sample_batch(1);
+        sample_batch(0) = sample;
+        advance(sample_batch, m_lst);
+    }
+
+    /**
+     * @brief Advance the capital process with a new sample batch across multiple hypotheses.
+     * 
+     * @param samples Sample batch
+     * @param m_lst Vector of hypothesized means to test
+     */
+    void advance(const Vector32f& samples, const Vector32f& m_lst) {
         add_sample(samples);
         Float32 capital = lat_capital();
         
