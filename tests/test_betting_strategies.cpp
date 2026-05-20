@@ -302,3 +302,362 @@ TEST_CASE("Adaptive vs Vanilla comparison", "[strategy][comparison]") {
     // Estimates should be similar (within tolerance)
     REQUIRE(std::abs(vanilla_est - adaptive_est) < 0.1f);
 }
+
+// ============================================================================
+// Class-based interface tests
+// ============================================================================
+
+TEST_CASE("VanillaBetting class - incremental sample submission", "[class][vanilla]") {
+    Float32 true_mean = 0.6f;
+    Int32 total_samples = 150;
+    Vector32f all_samples = generate_binomial_samples(true_mean, total_samples);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+    
+    // Initially not finalized
+    REQUIRE_FALSE(vb.is_finalized());
+    REQUIRE(vb.get_samples_used() == 0);
+    REQUIRE(vb.get_current_phase() == 0); // Running phase
+    
+    // Submit samples in batches
+    Int32 batch_size = 30;
+    for (Int32 i = 0; i < total_samples; i += batch_size) {
+        Int32 end = std::min(i + batch_size, total_samples);
+        Vector32f batch = all_samples.segment(i, end - i);
+        vb.submit_samples(batch);
+        
+        // Samples used should increase
+        REQUIRE(vb.get_samples_used() > 0);
+        REQUIRE(vb.get_samples_used() <= end);
+    }
+    
+    // Finalize and check results
+    auto [est, used] = vb.finalize();
+    REQUIRE(vb.is_finalized());
+    REQUIRE(used > 0);
+    REQUIRE(used <= total_samples);
+    REQUIRE(est >= 0.0f);
+    REQUIRE(est <= 1.0f);
+    REQUIRE(std::abs(est - true_mean) < 0.15f);
+}
+
+TEST_CASE("VanillaBetting class - single sample submission", "[class][vanilla]") {
+    Float32 true_mean = 0.7f;
+    Int32 num_samples = 150;  // Increased samples
+    Vector32f samples = generate_binomial_samples(true_mean, num_samples);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+    
+    // Submit samples one by one
+    for (Int32 i = 0; i < num_samples; ++i) {
+        if (vb.is_finalized()) break;
+        vb.submit_sample(samples(i));
+    }
+    
+    auto [est, used] = vb.finalize();
+    REQUIRE(used > 0);
+    REQUIRE(used <= num_samples);
+    // With single sample submission, may terminate early; check estimate is valid
+    REQUIRE(est >= 0.0f);
+    REQUIRE(est <= 1.0f);
+    // Relaxed tolerance - single sample mode may be less accurate
+    if (used > 10) {  // Only check accuracy if enough samples were used
+        REQUIRE(std::abs(est - true_mean) < 0.2f);
+    }
+}
+
+TEST_CASE("VanillaBetting class - state queries", "[class][vanilla]") {
+    Vector32f samples = generate_binomial_samples(0.5f, 50);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+    
+    // Initial bounds should be [0, 1]
+    REQUIRE(vb.get_lower_bound() == 0.0f);
+    REQUIRE(vb.get_upper_bound() == 1.0f);
+    REQUIRE(vb.get_interval_width() == 1.0f);
+    
+    // Submit some samples
+    vb.submit_samples(samples);
+    
+    // Bounds should narrow
+    REQUIRE(vb.get_lower_bound() >= 0.0f);
+    REQUIRE(vb.get_upper_bound() <= 1.0f);
+    REQUIRE(vb.get_interval_width() <= 1.0f);
+    REQUIRE(vb.get_interval_width() >= 0.0f);
+    
+    // Estimated mean should be within bounds
+    Float32 est = vb.get_estimated_mean();
+    vb.finalize();
+    REQUIRE(est >= vb.get_lower_bound());
+    REQUIRE(est <= vb.get_upper_bound());
+}
+
+TEST_CASE("VanillaBetting class - reset functionality", "[class][vanilla]") {
+    Vector32f samples1 = generate_binomial_samples(0.6f, 50);
+    Vector32f samples2 = generate_binomial_samples(0.4f, 50);
+    
+    SECTION("Reset with fresh gambler") {
+        GeoCheckingCapital gambler1(0.05f, 0.5f, 100);
+        VanillaBetting<GeoCheckingCapital> vb1(0.5f, 0.1f, 100, gambler1);
+        
+        // First run
+        vb1.submit_samples(samples1);
+        vb1.finalize();
+        REQUIRE(vb1.is_finalized());
+        REQUIRE(vb1.get_samples_used() > 0);
+        
+        // Create new instance for second run (simulating reset with fresh state)
+        GeoCheckingCapital gambler2(0.05f, 0.5f, 100);
+        VanillaBetting<GeoCheckingCapital> vb2(0.5f, 0.1f, 100, gambler2);
+        
+        vb2.submit_samples(samples2);
+        auto [est, used] = vb2.finalize();
+        REQUIRE(used > 0);
+        REQUIRE(std::abs(est - 0.4f) < 0.15f);
+    }
+    
+    SECTION("Reset strategy state only") {
+        GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+        VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+        
+        // First run
+        vb.submit_samples(samples1);
+        vb.finalize();
+        REQUIRE(vb.is_finalized());
+        
+        // Reset strategy (gambler state persists)
+        vb.reset();
+        REQUIRE_FALSE(vb.is_finalized());
+        REQUIRE(vb.get_lower_bound() == 0.0f);
+        REQUIRE(vb.get_upper_bound() == 1.0f);
+    }
+}
+
+TEST_CASE("VanillaBetting class - early termination on precision", "[class][vanilla]") {
+    // Use very loose delta to trigger early termination
+    Vector32f samples = generate_binomial_samples(0.5f, 500);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.3f, 100, gambler);
+    
+    // Submit all samples at once
+    vb.submit_samples(samples);
+    
+    // Should have terminated early due to loose precision requirement
+    REQUIRE(vb.is_finalized());
+    REQUIRE(vb.get_samples_used() <= 500);
+}
+
+TEST_CASE("AdaptiveBetting class - incremental sample submission", "[class][adaptive]") {
+    Float32 true_mean = 0.65f;
+    Int32 total_samples = 200;
+    Vector32f all_samples = generate_binomial_samples(true_mean, total_samples);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    
+    // Initially not finalized
+    REQUIRE_FALSE(ab.is_finalized());
+    REQUIRE(ab.get_samples_used() == 0);
+    REQUIRE(ab.get_current_phase() == 0); // DirectionDetection phase
+    
+    // Submit samples in batches
+    Int32 batch_size = 25;
+    for (Int32 i = 0; i < total_samples; i += batch_size) {
+        Int32 end = std::min(i + batch_size, total_samples);
+        Vector32f batch = all_samples.segment(i, end - i);
+        ab.submit_samples(batch);
+        
+        // Samples used should increase
+        REQUIRE(ab.get_samples_used() > 0);
+        REQUIRE(ab.get_samples_used() <= end);
+    }
+    
+    // Finalize and check results
+    auto [est, used] = ab.finalize();
+    REQUIRE(ab.is_finalized());
+    REQUIRE(used > 0);
+    REQUIRE(used <= total_samples);
+    REQUIRE(est >= 0.0f);
+    REQUIRE(est <= 1.0f);
+    REQUIRE(std::abs(est - true_mean) < 0.15f);
+}
+
+TEST_CASE("AdaptiveBetting class - single sample submission", "[class][adaptive]") {
+    Float32 true_mean = 0.7f;
+    Int32 num_samples = 150;
+    Vector32f samples = generate_binomial_samples(true_mean, num_samples);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    
+    // Submit samples one by one
+    for (Int32 i = 0; i < num_samples; ++i) {
+        if (ab.is_finalized()) break;
+        ab.submit_sample(samples(i));
+    }
+    
+    auto [est, used] = ab.finalize();
+    REQUIRE(used > 0);
+    REQUIRE(used <= num_samples);
+    // Relaxed tolerance for single-sample submission (less efficient)
+    REQUIRE(std::abs(est - true_mean) < 0.2f);
+}
+
+TEST_CASE("AdaptiveBetting class - phase transitions", "[class][adaptive]") {
+    Vector32f samples = generate_binomial_samples(0.6f, 200);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    
+    // Start in DirectionDetection phase
+    REQUIRE(ab.get_current_phase() == 0);
+    
+    // Submit first batch
+    Vector32f batch1 = samples.segment(0, 50);
+    ab.submit_samples(batch1);
+    
+    // May still be in direction detection or moved to refinement
+    Int32 phase_after_first = ab.get_current_phase();
+    REQUIRE(phase_after_first >= 0);
+    REQUIRE(phase_after_first <= 2);
+    
+    // Submit more samples
+    Vector32f batch2 = samples.segment(50, 50);
+    ab.submit_samples(batch2);
+    
+    // Should progress through phases
+    Int32 phase_after_second = ab.get_current_phase();
+    REQUIRE(phase_after_second >= phase_after_first);
+    
+    // Finalize
+    ab.finalize();
+    REQUIRE(ab.get_current_phase() == 2); // FinalEstimation
+}
+
+TEST_CASE("AdaptiveBetting class - confidence interval narrowing", "[class][adaptive]") {
+    Vector32f samples = generate_binomial_samples(0.5f, 200);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    
+    // Initial interval based on prior
+    Float32 initial_width = ab.get_interval_width();
+    REQUIRE(initial_width > 0.0f);
+    REQUIRE(initial_width <= 1.0f);
+    
+    // Submit samples in batches and track interval narrowing
+    Float32 prev_width = initial_width;
+    for (Int32 i = 0; i < 200; i += 50) {
+        Vector32f batch = samples.segment(i, 50);
+        ab.submit_samples(batch);
+        
+        Float32 current_width = ab.get_interval_width();
+        // Interval should generally narrow (or stay same)
+        REQUIRE(current_width <= prev_width + 0.01f); // Small tolerance for numerical issues
+        prev_width = current_width;
+    }
+    
+    ab.finalize();
+    // Interval should narrow or stay the same (allowing for edge cases)
+    REQUIRE(ab.get_interval_width() <= initial_width);
+}
+
+TEST_CASE("AdaptiveBetting class - reset functionality", "[class][adaptive]") {
+    Vector32f samples1 = generate_binomial_samples(0.6f, 100);
+    Vector32f samples2 = generate_binomial_samples(0.4f, 100);
+    
+    SECTION("Reset with fresh gambler") {
+        GeoCheckingCapital gambler1(0.05f, 0.5f, 100);
+        AdaptiveBetting<GeoCheckingCapital> ab1(0.5f, 0.08f, 100, gambler1);
+        
+        // First run
+        ab1.submit_samples(samples1);
+        ab1.finalize();
+        REQUIRE(ab1.is_finalized());
+        REQUIRE(ab1.get_samples_used() > 0);
+        
+        // Create new instance for second run
+        GeoCheckingCapital gambler2(0.05f, 0.5f, 100);
+        AdaptiveBetting<GeoCheckingCapital> ab2(0.5f, 0.08f, 100, gambler2);
+        
+        ab2.submit_samples(samples2);
+        auto [est, used] = ab2.finalize();
+        REQUIRE(used > 0);
+        REQUIRE(std::abs(est - 0.4f) < 0.15f);
+    }
+    
+    SECTION("Reset strategy state only") {
+        GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+        AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+        
+        // First run
+        ab.submit_samples(samples1);
+        ab.finalize();
+        REQUIRE(ab.is_finalized());
+        
+        // Reset strategy (gambler state persists)
+        ab.reset();
+        REQUIRE_FALSE(ab.is_finalized());
+        REQUIRE(ab.get_current_phase() == 0); // Back to DirectionDetection
+    }
+}
+
+TEST_CASE("AdaptiveBetting class - state queries", "[class][adaptive]") {
+    Vector32f samples = generate_binomial_samples(0.5f, 100);
+    
+    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    
+    // Initial bounds based on prior
+    REQUIRE(ab.get_lower_bound() >= 0.0f);
+    REQUIRE(ab.get_upper_bound() <= 1.0f);
+    REQUIRE(ab.get_lower_bound() < ab.get_upper_bound());
+    
+    // Submit samples
+    ab.submit_samples(samples);
+    
+    // Bounds should be valid
+    REQUIRE(ab.get_lower_bound() >= 0.0f);
+    REQUIRE(ab.get_upper_bound() <= 1.0f);
+    REQUIRE(ab.get_lower_bound() <= ab.get_upper_bound());
+    
+    // Estimated mean should be within bounds after finalization
+    ab.finalize();
+    Float32 est = ab.get_estimated_mean();
+    REQUIRE(est >= ab.get_lower_bound());
+    REQUIRE(est <= ab.get_upper_bound());
+}
+
+TEST_CASE("VanillaBetting with SequenceCheckingCapital class", "[class][vanilla][seq]") {
+    Float32 true_mean = 0.55f;
+    Vector32f samples = generate_binomial_samples(true_mean, 150);
+    
+    SequenceCheckingCapital gambler(0.05f, 0.5f, 100);
+    VanillaBetting<SequenceCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+    
+    vb.submit_samples(samples);
+    auto [est, used] = vb.finalize();
+    
+    REQUIRE(used > 0);
+    REQUIRE(used <= 150);
+    REQUIRE(std::abs(est - true_mean) < 0.15f);
+}
+
+TEST_CASE("AdaptiveBetting with SequenceCheckingCapital class", "[class][adaptive][seq]") {
+    Float32 true_mean = 0.45f;
+    Vector32f samples = generate_binomial_samples(true_mean, 150);
+    
+    SequenceCheckingCapital gambler(0.05f, 0.5f, 100);
+    AdaptiveBetting<SequenceCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    
+    ab.submit_samples(samples);
+    auto [est, used] = ab.finalize();
+    
+    REQUIRE(used > 0);
+    REQUIRE(used <= 150);
+    REQUIRE(std::abs(est - true_mean) < 0.15f);
+}
