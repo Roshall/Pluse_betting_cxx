@@ -29,6 +29,275 @@ inline Touch operator&(Touch a, Touch b) {
 /**
  * @brief Adaptive betting strategy with dynamic confidence interval refinement.
  * 
+ * This class implements an adaptive betting strategy that:
+ * 1. First detects which direction (upper/lower) to explore
+ * 2. Then performs binary search to find tight bounds
+ * 3. Finally estimates the mean within the refined interval
+ * 
+ * Unlike the function-based approach, this class supports incremental sample
+ * feeding while maintaining state between calls.
+ * 
+ * @tparam CapitalProcess Type of capital process (GeoCheckingCapital or SequenceCheckingCapital)
+ */
+template<typename CapitalProcess>
+class AdaptiveBetting {
+public:
+    /**
+     * @brief Construct an AdaptiveBetting instance.
+     * 
+     * @param prior_mean Prior estimate of the mean
+     * @param delta Confidence level parameter (smaller = more confident)
+     * @param grid_num Number of grid points for hypothesis testing
+     * @param gambler Reference to capital process instance
+     */
+    AdaptiveBetting(Float32 prior_mean, Float32 delta, Int32 grid_num, CapitalProcess& gambler)
+        : gambler_(gambler),
+          prior_mean_(prior_mean),
+          delta_(delta),
+          grid_num_(grid_num),
+          stride_(1.0f / static_cast<Float32>(grid_num)),
+          l_(std::max(0.0f, prior_mean - delta)),
+          u_(std::min(1.0f, prior_mean + delta)),
+          li_(static_cast<Int32>(std::round(l_ * grid_num))),
+          ui_(static_cast<Int32>(std::round(u_ * grid_num))),
+          touch_(Touch::None),
+          samples_used_(0),
+          phase_(Phase::DirectionDetection),
+          estimated_mean_(prior_mean),
+          finalized_(false) {}
+
+    /**
+     * @brief Submit a single sample for processing.
+     * 
+     * Processes the sample according to the current phase of the algorithm.
+     * 
+     * @param sample The sample to process
+     */
+    void submit_sample(Float32 sample) {
+        submit_samples(Vector32f(sample));
+    }
+
+    /**
+     * @brief Submit multiple samples for processing.
+     * 
+     * This method adds all samples to the gambler in batch, then processes
+     * the algorithm logic in phases. This is more efficient than processing
+     * samples one by one.
+     * 
+     * @param samples Vector of samples to process
+     */
+    void submit_samples(const Vector32f& samples) {
+        if (finalized_) {
+            return;
+        }
+
+        // Add all samples to the gambler in batch
+        gambler_.add_sample(samples);
+        switch (phase_) {
+            case Phase::DirectionDetection:
+                process_direction_detection();
+                break;
+            case Phase::BoundsRefinement:
+                process_bounds_refinement();
+                break;
+            case Phase::FinalEstimation:
+                process_final_estimation(); 
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * @brief Get the current lower bound of the confidence interval.
+     */
+    Float32 get_lower_bound() const { return l_; }
+
+    /**
+     * @brief Get the current upper bound of the confidence interval.
+     */
+    Float32 get_upper_bound() const { return u_; }
+
+    /**
+     * @brief Get the width of the current confidence interval.
+     */
+    Float32 get_interval_width() const { return u_ - l_; }
+
+    /**
+     * @brief Get the current estimated mean.
+     */
+    Float32 get_estimated_mean() const { return estimated_mean_; }
+
+    /**
+     * @brief Get the number of samples used so far.
+     */
+    Int32 get_samples_used() const { return samples_used_; }
+
+    /**
+     * @brief Check if the algorithm has completed.
+     */
+    bool is_finalized() const { return finalized_; }
+
+    /**
+     * @brief Get the current phase of the algorithm.
+     */
+    Int32 get_current_phase() const { return static_cast<Int32>(phase_); }
+
+    /**
+     * @brief Finalize the algorithm and compute the final estimate.
+     * 
+     * @return Pair of (estimated_mean, samples_used)
+     */
+    std::pair<Float32, Int32> finalize() {
+        if (!finalized_) {
+            // Ensure final estimation is done
+            phase_ = Phase::FinalEstimation;
+            process_final_estimation();
+        }
+        return std::make_pair(estimated_mean_, samples_used_);
+    }
+
+    /**
+     * @brief Reset the state to initial conditions.
+     * 
+     * Allows reusing the same instance with the same parameters but fresh state.
+     */
+    void reset() {
+        l_ = std::max(0.0f, prior_mean_ - delta_);
+        u_ = std::min(1.0f, prior_mean_ + delta_);
+        li_ = static_cast<Int32>(std::round(l_ * grid_num_));
+        ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
+        touch_ = Touch::None;
+        samples_used_ = 0;
+        phase_ = Phase::DirectionDetection;
+        estimated_mean_ = prior_mean_;
+        finalized_ = false;
+        // Note: gambler_ state is not reset as it's owned externally
+    }
+
+private:
+    // Phases of the adaptive betting algorithm
+    enum class Phase {
+        DirectionDetection = 0,
+        BoundsRefinement = 1,
+        FinalEstimation = 2
+    };
+
+    CapitalProcess& gambler_;
+    
+    // Configuration parameters (immutable after construction)
+    const Float32 prior_mean_;
+    const Float32 delta_;
+    const Int32 grid_num_;
+    const Float32 stride_;
+    
+    // Current state
+    Float32 l_;           // Lower bound
+    Float32 u_;           // Upper bound
+    Int32 li_;            // Lower bound index
+    Int32 ui_;            // Upper bound index
+    Touch touch_;         // Touch flags
+    Int32 samples_used_;  // Number of samples processed
+    Phase phase_;         // Current algorithm phase
+    Float32 estimated_mean_;  // Current estimated mean
+    bool finalized_;      // Whether algorithm has completed
+
+    /**
+     * @brief Process direction detection phase for single sample.
+     */
+    bool process_direction_detection() {
+        // Test if we've touched either boundary
+        if ((touch_ & Touch::Lower) == Touch::None) {
+            if (bet_on(gambler_, l_, li_, 0)) {
+                touch_ |= Touch::Lower;
+            }
+        }
+
+        if ((touch_ & Touch::Upper) == Touch::None) {
+            if (bet_on(gambler_, u_, ui_, 1)) {
+                touch_ |= Touch::Upper;
+            }
+        }
+
+        // If either boundary touched, move to refinement phase
+        if (touch_ != Touch::None) {
+            phase_ = Phase::BoundsRefinement;
+        }
+
+        return false;
+    }
+
+
+    /**
+     * @brief Process bounds refinement phase for single sample.
+     */
+    bool process_bounds_refinement() {
+        if (li_ + 1 >= ui_) {
+            // Interval is already tight enough
+            phase_ = Phase::FinalEstimation;
+            return process_final_estimation();
+        }
+
+        Int32 mid = (li_ + ui_) / 2;
+        Float32 m = mid * stride_;
+
+        if (touch_ == Touch::Lower) {
+            // Refining lower bound
+            if (bet_on(gambler_, m, mid, 0)) {
+                // Midpoint rejected as lower bound
+                li_ = mid;
+            } else {
+                // Midpoint still plausible
+                ui_ = mid;
+            }
+        } else if (touch_ == Touch::Upper) {
+            // Refining upper bound
+            if (bet_on(gambler_, m, mid, 1)) {
+                // Midpoint rejected as upper bound
+                ui_ = mid;
+            } else {
+                // Midpoint still plausible
+                li_ = mid;
+            }
+        } else if (touch_ == Touch::Both) {
+            // Both bounds touched - interval is already tight
+            phase_ = Phase::FinalEstimation;
+            return process_final_estimation();
+        }
+
+        // Update bounds based on indices
+        if (touch_ == Touch::Lower) {
+            l_ = ui_ * stride_;
+        } else if (touch_ == Touch::Upper) {
+            u_ = li_ * stride_;
+        }
+
+        return false;
+    }
+
+
+    /**
+     * @brief Process final estimation phase.
+     */
+    bool process_final_estimation() {
+        estimated_mean_ = estimate(gambler_, l_, u_);
+
+        if (estimated_mean_ < 0.0f) {
+            estimated_mean_ = (l_ + u_) / 2.0f;
+        }
+
+        finalized_ = true;
+        return true;
+    }
+};
+
+// Convenience typedefs
+using GeoAdaptiveBetting = AdaptiveBetting<GeoCheckingCapital>;
+using SequenceAdaptiveBetting = AdaptiveBetting<SequenceCheckingCapital>;
+
+/**
+ * @brief Adaptive betting strategy with dynamic confidence interval refinement.
+ * 
  * This strategy adaptively narrows down the confidence interval by:
  * 1. First detecting which direction (upper/lower) to explore
  * 2. Then performing binary search to find tight bounds
@@ -51,145 +320,9 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
                                             Float32 delta,
                                             Int32 grid_num,
                                             CapitalProcess& gambler) {
-    // Initialize parameters
-    Float32 stride = 1.0f / static_cast<Float32>(grid_num);
-    
-    // Initial confidence interval around prior
-    Float32 l = std::max(0.0f, prior_mean - delta);
-    Float32 u = std::min(1.0f, prior_mean + delta);
-    
-    // Convert to indices
-    Int32 li = static_cast<Int32>(std::round(l * grid_num));
-    Int32 ui = static_cast<Int32>(std::round(u * grid_num));
-    
-    // Touch flags: bit 0 = lower touched, bit 1 = upper touched
-    Touch touch = Touch::None;
-    
-    // Phase 1: Detect direction by advancing until one boundary is touched
-    Int32 i = 0;
-    while (i < samples.size()) {
-        gambler.add_sample(samples(i++));
-        
-        // Test if we've touched either boundary
-        if ((touch & Touch::Lower) == Touch::None) {
-            // Check lower bound
-            if (bet_on(gambler, l, li, 0)) {
-                touch |= Touch::Lower;  // Mark lower as touched
-            }
-        }
-
-        if ((touch & Touch::Upper) == Touch::None) {
-            // Check upper bound
-            if (bet_on(gambler, u, ui, 1)) {
-                touch |= Touch::Upper;  // Mark upper as touched
-            }
-        }
-        
-        // If both touched or one touched, we can proceed
-        if (touch != Touch::None) {
-            break;
-        }
-    }
-    
-    // Handle edge cases
-    if (i >= samples.size()) {
-        // Ran out of samples without touching anything
-        return std::make_pair(prior_mean, static_cast<Int32>(samples.size()));
-    }
-    
-    // Phase 2: Refine bounds based on which direction was detected
-    if (touch == Touch::Lower) {
-        // Only lower bound touched - need to find new lower bound
-        
-        // Binary search for lower bound
-        while (li + 1 < ui) {
-            Int32 mid = (li + ui) / 2;
-            Float32 m = mid * stride;
-            
-            // Continue adding samples during search
-            bool found_mid = false;
-            while (i < samples.size()) {
-                gambler.add_sample(samples(i++));
-                
-                if (bet_on(gambler, m, mid, 0)) {
-                    // Midpoint rejected as lower bound
-                    li = mid;
-                    found_mid = true;
-                    break;
-                } else {
-                    // Midpoint still plausible
-                    ui = mid;
-                    found_mid = true;
-                    break;
-                }
-            }
-            
-            if (!found_mid) {
-                // Ran out of samples
-                break;
-            }
-        }
-        
-        // Update lower bound
-        l = ui * stride;
-        
-    } else if (touch == Touch::Upper) {
-        // Only upper bound touched - need to find new upper bound
-        
-        // Binary search for upper bound
-        while (li + 1 < ui) {
-            Int32 mid = (li + ui) / 2;
-            Float32 m = mid * stride;
-            
-            // Continue adding samples during search
-            bool found_mid = false;
-            while (i < samples.size()) {
-                gambler.add_sample(samples(i++));
-                
-                if (bet_on(gambler, m, mid, 1)) {
-                    // Midpoint rejected as upper bound
-                    ui = mid;
-                    found_mid = true;
-                    break;
-                } else {
-                    // Midpoint still plausible
-                    li = mid;
-                    found_mid = true;
-                    break;
-                }
-            }
-            
-            if (!found_mid) {
-                // Ran out of samples
-                break;
-            }
-        }
-        
-        // Update upper bound
-        u = li * stride;
-        
-    } else if (touch == Touch::Both) {
-        // Both bounds touched - interval is already tight
-        // Could perform additional refinement here if needed
-    }
-    
-    // Phase 3: Final estimation within refined interval
-    // Use remaining samples for final estimate
-    while (i < samples.size()) {
-        gambler.add_sample(samples(i++));
-    }
-    
-    // Get final estimate using the estimate function
-    Float32 estimated_mean = estimate(gambler, l, u);
-    
-    // Fallback if estimate fails
-    if (estimated_mean < 0.0f) {
-        estimated_mean = (l + u) / 2.0f;
-    }
-    
-    Int32 samples_used = gambler.s_ptr();
-    
-    return std::make_pair(estimated_mean, samples_used);
+    AdaptiveBetting<CapitalProcess> ab(prior_mean, delta, grid_num, gambler);
+    ab.submit_samples(samples);
+    return ab.finalize();
 }
 
 /**
