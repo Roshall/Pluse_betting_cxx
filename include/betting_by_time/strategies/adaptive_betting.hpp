@@ -61,7 +61,6 @@ public:
           li_(static_cast<Int32>(std::round(l_ * grid_num))),
           ui_(static_cast<Int32>(std::round(u_ * grid_num))),
           touch_(Touch::None),
-          samples_used_(0),
           phase_(Phase::DirectionDetection),
           estimated_mean_(prior_mean),
           finalized_(false) {}
@@ -93,6 +92,7 @@ public:
 
         // Add all samples to the gambler in batch
         gambler_.add_sample(samples);
+        
         switch (phase_) {
             case Phase::DirectionDetection:
                 process_direction_detection();
@@ -131,7 +131,7 @@ public:
     /**
      * @brief Get the number of samples used so far.
      */
-    Int32 get_samples_used() const { return samples_used_; }
+    Int32 get_samples_used() const { return gambler_.s_ptr(); }
 
     /**
      * @brief Check if the algorithm has completed.
@@ -154,7 +154,7 @@ public:
             phase_ = Phase::FinalEstimation;
             process_final_estimation();
         }
-        return std::make_pair(estimated_mean_, samples_used_);
+        return std::make_pair(estimated_mean_, gambler_.s_ptr());
     }
 
     /**
@@ -168,7 +168,6 @@ public:
         li_ = static_cast<Int32>(std::round(l_ * grid_num_));
         ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
         touch_ = Touch::None;
-        samples_used_ = 0;
         phase_ = Phase::DirectionDetection;
         estimated_mean_ = prior_mean_;
         finalized_ = false;
@@ -197,7 +196,6 @@ private:
     Int32 li_;            // Lower bound index
     Int32 ui_;            // Upper bound index
     Touch touch_;         // Touch flags
-    Int32 samples_used_;  // Number of samples processed
     Phase phase_;         // Current algorithm phase
     Float32 estimated_mean_;  // Current estimated mean
     bool finalized_;      // Whether algorithm has completed
@@ -343,7 +341,7 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
             }
             
             // Extract batch and submit
-            Vector32f batch(samples.begin() + start, samples.begin() + end);
+            Vector32f batch = samples.segment(start, end - start);
             ab.submit_samples(batch);
         }
     }
