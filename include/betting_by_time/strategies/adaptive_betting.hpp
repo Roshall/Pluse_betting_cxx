@@ -309,6 +309,11 @@ using SequenceAdaptiveBetting = AdaptiveBetting<SequenceCheckingCapital>;
  * @param delta Confidence level parameter (smaller = more confident)
  * @param grid_num Number of grid points for hypothesis testing
  * @param gambler Reference to capital process instance
+ * @param breakpoints Vector of indices indicating batch boundaries. Samples are submitted in batches:
+ *                    [breakpoints[0], breakpoints[1]), [breakpoints[1], breakpoints[2]), ..., 
+ *                    [breakpoints[n-2], breakpoints[n-1])
+ *                    Example: for 10 samples with breakpoints [0, 3, 7, 10], 
+ *                    submits samples [0,3), then [3,7), then [7,10)
  * @return Pair of (estimated_mean, samples_used)
  * 
  * @note This is more sample-efficient than vanilla betting but requires
@@ -319,9 +324,30 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
                                             Float32 prior_mean,
                                             Float32 delta,
                                             Int32 grid_num,
-                                            CapitalProcess& gambler) {
+                                            CapitalProcess& gambler,
+                                            const std::vector<Int32>& breakpoints = {}) {
     AdaptiveBetting<CapitalProcess> ab(prior_mean, delta, grid_num, gambler);
-    ab.submit_samples(samples);
+    
+    if (breakpoints.empty()) {
+        // No breakpoints provided, submit all samples at once
+        ab.submit_samples(samples);
+    } else {
+        // Submit samples in batches according to breakpoints
+        for (size_t i = 0; i < breakpoints.size() - 1; ++i) {
+            Int32 start = breakpoints[i];
+            Int32 end = breakpoints[i + 1];
+            
+            // Validate indices
+            if (start < 0 || end > static_cast<Int32>(samples.size()) || start >= end) {
+                continue;
+            }
+            
+            // Extract batch and submit
+            Vector32f batch(samples.begin() + start, samples.begin() + end);
+            ab.submit_samples(batch);
+        }
+    }
+    
     return ab.finalize();
 }
 
@@ -332,9 +358,10 @@ inline std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
                                                    Float32 prior_mean,
                                                    Float32 delta,
                                                    Int32 grid_num,
-                                                   GeoCheckingCapital& gambler) {
+                                                   GeoCheckingCapital& gambler,
+                                                   const std::vector<Int32>& breakpoints = {}) {
     return adaptive_betting<GeoCheckingCapital>(samples, prior_mean, delta, 
-                                                 grid_num, gambler);
+                                                 grid_num, gambler, breakpoints);
 }
 
 /**
@@ -344,9 +371,10 @@ inline std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
                                                    Float32 prior_mean,
                                                    Float32 delta,
                                                    Int32 grid_num,
-                                                   SequenceCheckingCapital& gambler) {
+                                                   SequenceCheckingCapital& gambler,
+                                                   const std::vector<Int32>& breakpoints = {}) {
     return adaptive_betting<SequenceCheckingCapital>(samples, prior_mean, delta, 
-                                                      grid_num, gambler);
+                                                      grid_num, gambler, breakpoints);
 }
 
 } // namespace betting
