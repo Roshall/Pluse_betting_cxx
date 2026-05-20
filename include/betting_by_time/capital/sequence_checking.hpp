@@ -170,6 +170,21 @@ public:
         }
     }
 
+    /**
+     * @brief Advance the capital process with a batch of new samples across multiple hypotheses.
+     *
+     * For simplicity this implementation just loops over the provided samples and
+     * delegates to the scalar `advance` implementation for each element.
+     *
+     * @param samples Batch of new sample values
+     * @param m_lst Vector of hypothesized means to test
+     */
+    void advance(const Vector32f& samples, const Vector32f& m_lst) {
+        for (Int32 i = 0; i < samples.size(); ++i) {
+            advance(samples(i), m_lst);
+        }
+    }
+
     // Accessors
     const Matrix64d& cum_cap_twins() const { return cum_cap_twins_; }
     Matrix64d& cum_cap_twins() { return cum_cap_twins_; }
