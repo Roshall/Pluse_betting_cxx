@@ -6,6 +6,7 @@
 #include <catch2/catch_all.hpp>
 #include "betting_by_time/capital/geo_checking.hpp"
 #include "betting_by_time/capital/sequence_checking.hpp"
+
 #include <random>
 
 using namespace betting;

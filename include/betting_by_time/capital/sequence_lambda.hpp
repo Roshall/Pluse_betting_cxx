@@ -60,10 +60,10 @@ public:
     /**
      * @brief Update the confidence parameter.
      * 
-     * @param delta New delta value
+     * @param alpha New alpha value
      */
-    void set_delta(Float32 delta) {
-        c_ = cal_c(delta);
+    void set_alpha(Float32 alpha) {
+        c_ = cal_c(alpha);
     }
 
     /**

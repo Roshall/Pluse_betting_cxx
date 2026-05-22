@@ -21,9 +21,8 @@ BettingFactoryResult betting_factory(BetStrategy strategy, CapitalType capital) 
                                              Float32 prior_mean,
                                              Float32 delta,
                                              Int32 grid_num,
-                                             std::any& gambler_any) {
-                        auto& gambler = std::any_cast<GeoCheckingCapital&>(gambler_any);
-                        return vanilla_betting(samples, prior_mean, delta, grid_num, gambler);
+                                             [[maybe_unused]] std::any& gambler_any) {
+                        return vanilla_betting(samples, prior_mean, delta, grid_num);
                     };
                     
                     return std::make_pair(make_gambler, bet_fn);
@@ -38,9 +37,8 @@ BettingFactoryResult betting_factory(BetStrategy strategy, CapitalType capital) 
                                              Float32 prior_mean,
                                              Float32 delta,
                                              Int32 grid_num,
-                                             std::any& gambler_any) {
-                        auto& gambler = std::any_cast<SequenceCheckingCapital&>(gambler_any);
-                        return vanilla_betting(samples, prior_mean, delta, grid_num, gambler);
+                                             [[maybe_unused]] std::any& gambler_any) {
+                        return vanilla_betting_sequence(samples, prior_mean, delta, grid_num);
                     };
                     
                     return std::make_pair(make_gambler, bet_fn);
@@ -62,9 +60,8 @@ BettingFactoryResult betting_factory(BetStrategy strategy, CapitalType capital) 
                                              Float32 prior_mean,
                                              Float32 delta,
                                              Int32 grid_num,
-                                             std::any& gambler_any) {
-                        auto& gambler = std::any_cast<GeoCheckingCapital&>(gambler_any);
-                        return adaptive_betting(samples, prior_mean, delta, grid_num, gambler);
+                                             [[maybe_unused]] std::any& gambler_any) {
+                        return adaptive_betting(samples, prior_mean, delta, grid_num);
                     };
                     
                     return std::make_pair(make_gambler, bet_fn);
@@ -79,9 +76,8 @@ BettingFactoryResult betting_factory(BetStrategy strategy, CapitalType capital) 
                                              Float32 prior_mean,
                                              Float32 delta,
                                              Int32 grid_num,
-                                             std::any& gambler_any) {
-                        auto& gambler = std::any_cast<SequenceCheckingCapital&>(gambler_any);
-                        return adaptive_betting(samples, prior_mean, delta, grid_num, gambler);
+                                             [[maybe_unused]] std::any& gambler_any) {
+                        return adaptive_betting_sequence(samples, prior_mean, delta, grid_num);
                     };
                     
                     return std::make_pair(make_gambler, bet_fn);

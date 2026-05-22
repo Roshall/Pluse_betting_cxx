@@ -19,7 +19,7 @@ class TimeSliceOptLambda {
 private:
     Float32 cum_;           ///< Cumulative sum of samples
     Float32 cum_diff2_;     ///< Cumulative sum of squared differences
-    Float32 c_;             ///< Confidence constant (depends on delta)
+    Float32 c_;             ///< Confidence constant (depends on alpha)
     Float32 lbd_cum_;       ///< Cumulative lambda
     Float32 lbd2_cum_;      ///< Cumulative lambda squared
     Int32 t_;               ///< Time step counter
@@ -31,15 +31,15 @@ public:
      * @param prior_mean Prior estimate of the mean (default: 0.5)
      * @param prior_var Prior estimate of the variance (default: 0.25)
      * @param num Initial time step (default: 1)
-     * @param delta Confidence parameter (default: 0.05)
+     * @param alpha Confidence parameter (default: 0.05)
      */
     TimeSliceOptLambda(Float32 prior_mean = 0.5f,
                        Float32 prior_var = 0.25f,
                        Int32 num = 1,
-                       Float32 delta = 0.05f)
+                       Float32 alpha = 0.05f)
         : cum_(prior_mean * num),
           cum_diff2_(prior_var * num),
-          c_(cal_c(delta)),
+          c_(cal_c(alpha)),
           lbd_cum_(std::sqrt(c_ / (prior_var * num)) * num),
           lbd2_cum_(lbd_cum_ * std::sqrt(c_ / (prior_var * num))),
           t_(num - 1) {}
@@ -61,11 +61,11 @@ public:
     }
 
     /**
-     * @brief Update the confidence parameter delta.
+     * @brief Update the confidence parameter alpha.
      * 
-     * @param d New delta value
+     * @param d New alpha value
      */
-    void set_delta(Float32 d) {
+    void set_alpha(Float32 d) {
         c_ = cal_c(d);
     }
 

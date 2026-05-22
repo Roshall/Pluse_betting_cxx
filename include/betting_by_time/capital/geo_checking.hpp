@@ -31,7 +31,7 @@ public:
     /**
      * @brief Construct a new Geo Checking Capital object.
      * 
-     * @param delta Confidence parameter
+     * @param alpha Confidence parameter
      * @param trunc_scale Truncation scale for bets
      * @param grid_num Number of grid points for hypothesis testing
      * @param prior_mean Prior estimate of mean
@@ -39,7 +39,7 @@ public:
      * @param num Initial time step
      * @param sample_num Pre-allocated sample capacity
      */
-    explicit GeoCheckingCapital(Float32 delta = 0.05f,
+    explicit GeoCheckingCapital(Float32 alpha = 0.05f,
                                 Float32 trunc_scale = 0.5f,
                                 Int32 grid_num = 1000,
                                 Float32 prior_mean = 0.5f,
@@ -51,9 +51,9 @@ public:
           capitals_(Vector32f::Zero(1000)),
           samples_(Vector32f::Zero(sample_num)),
           s_pos_(Vector32i::Zero(1000)),
-          cap_mine_(prior_mean, prior_var, num, delta * 0.5f),
+          cap_mine_(prior_mean, prior_var, num, alpha * 0.5f),
           trunc_scale_(trunc_scale),
-          threshold_(1.0f / delta),
+          threshold_(1.0f / alpha),
           grid_num_(grid_num),
           s_ptr_(0) {
         s_pos_(0) = 0;
@@ -87,13 +87,13 @@ public:
     }
 
     /**
-     * @brief Update the confidence parameter delta.
+     * @brief Update the confidence parameter a.
      * 
-     * @param delta New delta value
+     * @param alpha New alpha value
      */
-    void set_delta(Float32 delta) {
-        threshold_ = 1.0f / delta;
-        cap_mine_.set_delta(delta);
+    void set_alpha(Float32 alpha) {
+        threshold_ = 1.0f / alpha;
+        cap_mine_.set_alpha(alpha);
     }
 
     /**

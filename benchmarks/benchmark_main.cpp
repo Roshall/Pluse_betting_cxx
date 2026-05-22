@@ -39,8 +39,7 @@ static void BM_VanillaGeo_Small(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -52,8 +51,7 @@ static void BM_VanillaGeo_Medium(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -65,8 +63,7 @@ static void BM_VanillaGeo_Large(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -78,8 +75,7 @@ static void BM_VanillaSeq_Small(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        SequenceCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = vanilla_betting_sequence(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -91,8 +87,7 @@ static void BM_VanillaSeq_Medium(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        SequenceCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = vanilla_betting_sequence(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -104,8 +99,7 @@ static void BM_VanillaSeq_Large(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        SequenceCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = vanilla_betting_sequence(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -121,8 +115,7 @@ static void BM_AdaptiveGeo_Small(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -134,8 +127,7 @@ static void BM_AdaptiveGeo_Medium(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -147,8 +139,7 @@ static void BM_AdaptiveGeo_Large(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -160,8 +151,7 @@ static void BM_AdaptiveSeq_Small(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        SequenceCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = adaptive_betting_sequence(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -173,8 +163,7 @@ static void BM_AdaptiveSeq_Medium(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        SequenceCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = adaptive_betting_sequence(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -186,8 +175,7 @@ static void BM_AdaptiveSeq_Large(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        SequenceCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = adaptive_betting_sequence(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -203,8 +191,7 @@ static void BM_GridScaling(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -220,8 +207,7 @@ static void BM_SampleScaling(benchmark::State& state) {
     Vector32f samples = generate_samples(0.65f, num_samples);
     
     for (auto _ : state) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+        auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num);
         benchmark::DoNotOptimize(result);
     }
 }
@@ -290,16 +276,14 @@ static void BM_Comparison_Vanilla_vs_Adaptive_Geo(benchmark::State& state) {
     // Benchmark vanilla
     if (state.thread_index() == 0) {
         for (auto _ : state) {
-            GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-            auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+            auto result = vanilla_betting(samples, 0.5f, 0.1f, grid_num);
             benchmark::DoNotOptimize(result);
         }
     }
     // Benchmark adaptive
     else {
         for (auto _ : state) {
-            GeoCheckingCapital gambler(0.05f, 0.5f, grid_num);
-            auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num, gambler);
+            auto result = adaptive_betting(samples, 0.5f, 0.1f, grid_num);
             benchmark::DoNotOptimize(result);
         }
     }

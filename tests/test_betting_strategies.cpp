@@ -35,9 +35,8 @@ TEST_CASE("Vanilla betting with GeoCheckingCapital", "[strategy][vanilla][geo]")
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
     // Run vanilla betting
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
     auto [estimated_mean, samples_used] = vanilla_betting(
-        samples, 0.5f, 0.1f, 100, gambler
+        samples, 0.5f, 0.1f, 100
     );
     
     // Check results
@@ -57,9 +56,8 @@ TEST_CASE("Vanilla betting with SequenceCheckingCapital", "[strategy][vanilla][s
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
     // Run vanilla betting
-    SequenceCheckingCapital gambler(0.05f, 0.5f, 100);
-    auto [estimated_mean, samples_used] = vanilla_betting(
-        samples, 0.5f, 0.1f, 100, gambler
+    auto [estimated_mean, samples_used] = vanilla_betting_sequence(
+        samples, 0.5f, 0.1f, 100
     );
     
     // Check results
@@ -79,10 +77,8 @@ TEST_CASE("Adaptive betting with GeoCheckingCapital", "[strategy][adaptive][geo]
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
     // Run adaptive betting
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    REQUIRE(gambler.s_ptr() == 0);  // Ensure no samples added yet
     auto [estimated_mean, samples_used] = adaptive_betting(
-        samples, 0.5f, 0.08f, 100, gambler
+        samples, 0.5f, 0.08f, 100
     );
     
     // Check results
@@ -102,9 +98,8 @@ TEST_CASE("Adaptive betting with SequenceCheckingCapital", "[strategy][adaptive]
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
     // Run adaptive betting
-    SequenceCheckingCapital gambler(0.05f, 0.5f, 100);
-    auto [estimated_mean, samples_used] = adaptive_betting(
-        samples, 0.5f, 0.08f, 100, gambler
+    auto [estimated_mean, samples_used] = adaptive_betting_sequence(
+        samples, 0.5f, 0.08f, 100
     );
     
     // Check results
@@ -120,12 +115,9 @@ TEST_CASE("Adaptive betting with SequenceCheckingCapital", "[strategy][adaptive]
 TEST_CASE("Framework API - vanilla geo factory", "[framework][vanilla]") {
     auto [make_gambler, bet_fn] = vanilla_geo_factory();
     
-    auto gambler = make_gambler(0.05f, 0.5f, 100);
-    
-    REQUIRE(gambler.type() == typeid(GeoCheckingCapital));
-    
     Vector32f samples = generate_binomial_samples(0.6f, 100);
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, gambler);
+    std::any unused_gambler;
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, unused_gambler);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -135,12 +127,9 @@ TEST_CASE("Framework API - vanilla geo factory", "[framework][vanilla]") {
 TEST_CASE("Framework API - vanilla seq factory", "[framework][vanilla]") {
     auto [make_gambler, bet_fn] = vanilla_seq_factory();
     
-    auto gambler = make_gambler(0.05f, 0.5f, 100);
-    
-    REQUIRE(gambler.type() == typeid(SequenceCheckingCapital));
-    
     Vector32f samples = generate_binomial_samples(0.4f, 100);
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, gambler);
+    std::any unused_gambler;
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, unused_gambler);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -149,12 +138,10 @@ TEST_CASE("Framework API - vanilla seq factory", "[framework][vanilla]") {
 
 TEST_CASE("Framework API - adaptive geo factory", "[framework][adaptive]") {
     auto [make_gambler, bet_fn] = adaptive_geo_factory();
-    
-    auto gambler = make_gambler(0.05f, 0.5f, 100);
-    REQUIRE(gambler.type() == typeid(GeoCheckingCapital));
 
     Vector32f samples = generate_binomial_samples(0.7f, 150);
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, gambler);
+    std::any unused_gambler;
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, unused_gambler);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -164,11 +151,9 @@ TEST_CASE("Framework API - adaptive geo factory", "[framework][adaptive]") {
 TEST_CASE("Framework API - adaptive seq factory", "[framework][adaptive]") {
     auto [make_gambler, bet_fn] = adaptive_seq_factory();
 
-    auto gambler = make_gambler(0.05f, 0.5f, 100);
-    REQUIRE(gambler.type() == typeid(SequenceCheckingCapital));
-
     Vector32f samples = generate_binomial_samples(0.3f, 150);
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, gambler);
+    std::any unused_gambler;
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, unused_gambler);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -178,12 +163,14 @@ TEST_CASE("Framework API - adaptive seq factory", "[framework][adaptive]") {
 TEST_CASE("Generic betting factory", "[framework]") {
     SECTION("Vanilla Geo") {
         auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Vanilla, CapitalType::Geo);
-        auto gambler = make_gambler(0.05f, 0.5f, 50);
-
-        REQUIRE(gambler.type() == typeid(GeoCheckingCapital));
-
+        
+        // Note: With internal gambler ownership, the factory's make_gambler is no longer used
+        // by the betting function. It's kept for API compatibility.
+        
         Vector32f samples = generate_binomial_samples(0.5f, 50);
-        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
+        // Pass empty any since betting function creates its own internal gambler
+        std::any unused_gambler;
+        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, unused_gambler);
 
         REQUIRE(est >= 0.0f);
         REQUIRE(est <= 1.0f);
@@ -192,12 +179,10 @@ TEST_CASE("Generic betting factory", "[framework]") {
 
     SECTION("Vanilla Seq") {
         auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Vanilla, CapitalType::Seq);
-        auto gambler = make_gambler(0.05f, 0.5f, 50);
-
-        REQUIRE(gambler.type() == typeid(SequenceCheckingCapital));
-
+        
         Vector32f samples = generate_binomial_samples(0.5f, 50);
-        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
+        std::any unused_gambler;
+        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, unused_gambler);
 
         REQUIRE(est >= 0.0f);
         REQUIRE(est <= 1.0f);
@@ -206,12 +191,10 @@ TEST_CASE("Generic betting factory", "[framework]") {
 
     SECTION("Adaptive Geo") {
         auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Ada, CapitalType::Geo);
-        auto gambler = make_gambler(0.05f, 0.5f, 50);
-
-        REQUIRE(gambler.type() == typeid(GeoCheckingCapital));
 
         Vector32f samples = generate_binomial_samples(0.5f, 50);
-        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
+        std::any unused_gambler;
+        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, unused_gambler);
 
         REQUIRE(est >= 0.0f);
         REQUIRE(est <= 1.0f);
@@ -220,12 +203,10 @@ TEST_CASE("Generic betting factory", "[framework]") {
 
     SECTION("Adaptive Seq") {
         auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Ada, CapitalType::Seq);
-        auto gambler = make_gambler(0.05f, 0.5f, 50);
-
-        REQUIRE(gambler.type() == typeid(SequenceCheckingCapital));
 
         Vector32f samples = generate_binomial_samples(0.5f, 50);
-        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, gambler);
+        std::any unused_gambler;
+        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, unused_gambler);
 
         REQUIRE(est >= 0.0f);
         REQUIRE(est <= 1.0f);
@@ -250,15 +231,14 @@ TEST_CASE("Betting strategies handle edge cases", "[strategy]") {
     Vector32f empty_samples(0);
     
     GeoCheckingCapital gambler1(0.05f, 0.5f, 100);
-    auto [est1, used1] = vanilla_betting(empty_samples, 0.5f, 0.1f, 100, gambler1);
+    auto [est1, used1] = vanilla_betting(empty_samples, 0.5f, 0.1f, 100);
     REQUIRE(used1 == 0);
     
     // Single sample
     Vector32f single_sample(1);
     single_sample << 0.7f;
     
-    GeoCheckingCapital gambler2(0.05f, 0.5f, 100);
-    auto [est2, used2] = vanilla_betting(single_sample, 0.5f, 0.1f, 100, gambler2);
+    auto [est2, used2] = vanilla_betting(single_sample, 0.5f, 0.1f, 100);
     REQUIRE(used2 == 1);
     REQUIRE(est2 >= 0.0f);
     REQUIRE(est2 <= 1.0f);
@@ -271,8 +251,7 @@ TEST_CASE("Strategies work with different priors", "[strategy]") {
     std::vector<Float32> priors = {0.3f, 0.5f, 0.7f};
     
     for (Float32 prior : priors) {
-        GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-        auto [est, used] = vanilla_betting(samples, prior, 0.1f, 100, gambler);
+        auto [est, used] = vanilla_betting(samples, prior, 0.1f, 100);
         
         // Should still estimate correctly regardless of prior
         REQUIRE(std::abs(est - true_mean) < 0.15f);
@@ -284,15 +263,13 @@ TEST_CASE("Adaptive vs Vanilla comparison", "[strategy][comparison]") {
     Vector32f samples = generate_binomial_samples(true_mean, 300);
     
     // Vanilla
-    GeoCheckingCapital vanilla_gambler(0.05f, 0.5f, 100);
     auto [vanilla_est, vanilla_used] = vanilla_betting(
-        samples, 0.5f, 0.1f, 100, vanilla_gambler
+        samples, 0.5f, 0.1f, 100
     );
     
     // Adaptive
-    GeoCheckingCapital adaptive_gambler(0.05f, 0.5f, 100);
     auto [adaptive_est, adaptive_used] = adaptive_betting(
-        samples, 0.5f, 0.1f, 100, adaptive_gambler
+        samples, 0.5f, 0.1f, 100
     );
     
     // Both should produce reasonable estimates
@@ -312,8 +289,7 @@ TEST_CASE("VanillaBetting class - incremental sample submission", "[class][vanil
     Int32 total_samples = 150;
     Vector32f all_samples = generate_binomial_samples(true_mean, total_samples);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100);
     
     // Initially not finalized
     REQUIRE_FALSE(vb.is_finalized());
@@ -347,8 +323,7 @@ TEST_CASE("VanillaBetting class - single sample submission", "[class][vanilla]")
     Int32 num_samples = 150;  // Increased samples
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100);
     
     // Submit samples one by one
     for (Int32 i = 0; i < num_samples; ++i) {
@@ -371,8 +346,7 @@ TEST_CASE("VanillaBetting class - single sample submission", "[class][vanilla]")
 TEST_CASE("VanillaBetting class - state queries", "[class][vanilla]") {
     Vector32f samples = generate_binomial_samples(0.5f, 50);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100);
     
     // Initial bounds should be [0, 1]
     REQUIRE(vb.get_lower_bound() == 0.0f);
@@ -399,9 +373,8 @@ TEST_CASE("VanillaBetting class - reset functionality", "[class][vanilla]") {
     Vector32f samples1 = generate_binomial_samples(0.6f, 50);
     Vector32f samples2 = generate_binomial_samples(0.4f, 50);
     
-    SECTION("Reset with fresh gambler") {
-        GeoCheckingCapital gambler1(0.05f, 0.5f, 100);
-        VanillaBetting<GeoCheckingCapital> vb1(0.5f, 0.1f, 100, gambler1);
+    SECTION("Reset with fresh instance") {
+        VanillaBetting<GeoCheckingCapital> vb1(0.5f, 0.1f, 100);
         
         // First run
         vb1.submit_samples(samples1);
@@ -410,8 +383,7 @@ TEST_CASE("VanillaBetting class - reset functionality", "[class][vanilla]") {
         REQUIRE(vb1.get_samples_used() > 0);
         
         // Create new instance for second run (simulating reset with fresh state)
-        GeoCheckingCapital gambler2(0.05f, 0.5f, 100);
-        VanillaBetting<GeoCheckingCapital> vb2(0.5f, 0.1f, 100, gambler2);
+        VanillaBetting<GeoCheckingCapital> vb2(0.5f, 0.1f, 100);
         
         vb2.submit_samples(samples2);
         auto [est, used] = vb2.finalize();
@@ -420,8 +392,7 @@ TEST_CASE("VanillaBetting class - reset functionality", "[class][vanilla]") {
     }
     
     SECTION("Reset strategy state only") {
-        GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-        VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+        VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.1f, 100);
         
         // First run
         vb.submit_samples(samples1);
@@ -440,8 +411,7 @@ TEST_CASE("VanillaBetting class - early termination on precision", "[class][vani
     // Use very loose delta to trigger early termination
     Vector32f samples = generate_binomial_samples(0.5f, 500);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.3f, 100, gambler);
+    VanillaBetting<GeoCheckingCapital> vb(0.5f, 0.3f, 100);
     
     // Submit all samples at once
     vb.submit_samples(samples);
@@ -456,8 +426,7 @@ TEST_CASE("AdaptiveBetting class - incremental sample submission", "[class][adap
     Int32 total_samples = 200;
     Vector32f all_samples = generate_binomial_samples(true_mean, total_samples);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100);
     
     // Initially not finalized
     REQUIRE_FALSE(ab.is_finalized());
@@ -491,8 +460,7 @@ TEST_CASE("AdaptiveBetting class - single sample submission", "[class][adaptive]
     Int32 num_samples = 150;
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100);
     
     // Submit samples one by one
     for (Int32 i = 0; i < num_samples; ++i) {
@@ -510,8 +478,7 @@ TEST_CASE("AdaptiveBetting class - single sample submission", "[class][adaptive]
 TEST_CASE("AdaptiveBetting class - phase transitions", "[class][adaptive]") {
     Vector32f samples = generate_binomial_samples(0.6f, 200);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100);
     
     // Start in DirectionDetection phase
     REQUIRE(ab.get_current_phase() == 0);
@@ -541,8 +508,7 @@ TEST_CASE("AdaptiveBetting class - phase transitions", "[class][adaptive]") {
 TEST_CASE("AdaptiveBetting class - confidence interval narrowing", "[class][adaptive]") {
     Vector32f samples = generate_binomial_samples(0.5f, 200);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100);
     
     // Initial interval based on prior
     Float32 initial_width = ab.get_interval_width();
@@ -570,9 +536,8 @@ TEST_CASE("AdaptiveBetting class - reset functionality", "[class][adaptive]") {
     Vector32f samples1 = generate_binomial_samples(0.6f, 100);
     Vector32f samples2 = generate_binomial_samples(0.4f, 100);
     
-    SECTION("Reset with fresh gambler") {
-        GeoCheckingCapital gambler1(0.05f, 0.5f, 100);
-        AdaptiveBetting<GeoCheckingCapital> ab1(0.5f, 0.08f, 100, gambler1);
+    SECTION("Reset with fresh instance") {
+        AdaptiveBetting<GeoCheckingCapital> ab1(0.5f, 0.08f, 100);
         
         // First run
         ab1.submit_samples(samples1);
@@ -581,8 +546,7 @@ TEST_CASE("AdaptiveBetting class - reset functionality", "[class][adaptive]") {
         REQUIRE(ab1.get_samples_used() > 0);
         
         // Create new instance for second run
-        GeoCheckingCapital gambler2(0.05f, 0.5f, 100);
-        AdaptiveBetting<GeoCheckingCapital> ab2(0.5f, 0.08f, 100, gambler2);
+        AdaptiveBetting<GeoCheckingCapital> ab2(0.5f, 0.08f, 100);
         
         ab2.submit_samples(samples2);
         auto [est, used] = ab2.finalize();
@@ -591,8 +555,7 @@ TEST_CASE("AdaptiveBetting class - reset functionality", "[class][adaptive]") {
     }
     
     SECTION("Reset strategy state only") {
-        GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-        AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+        AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100);
         
         // First run
         ab.submit_samples(samples1);
@@ -609,8 +572,7 @@ TEST_CASE("AdaptiveBetting class - reset functionality", "[class][adaptive]") {
 TEST_CASE("AdaptiveBetting class - state queries", "[class][adaptive]") {
     Vector32f samples = generate_binomial_samples(0.5f, 100);
     
-    GeoCheckingCapital gambler(0.05f, 0.5f, 100);
-    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    AdaptiveBetting<GeoCheckingCapital> ab(0.5f, 0.08f, 100);
     
     // Initial bounds based on prior
     REQUIRE(ab.get_lower_bound() >= 0.0f);
@@ -636,8 +598,7 @@ TEST_CASE("VanillaBetting with SequenceCheckingCapital class", "[class][vanilla]
     Float32 true_mean = 0.55f;
     Vector32f samples = generate_binomial_samples(true_mean, 150);
     
-    SequenceCheckingCapital gambler(0.05f, 0.5f, 100);
-    VanillaBetting<SequenceCheckingCapital> vb(0.5f, 0.1f, 100, gambler);
+    VanillaBetting<SequenceCheckingCapital> vb(0.5f, 0.1f, 100);
     
     vb.submit_samples(samples);
     auto [est, used] = vb.finalize();
@@ -651,8 +612,7 @@ TEST_CASE("AdaptiveBetting with SequenceCheckingCapital class", "[class][adaptiv
     Float32 true_mean = 0.45f;
     Vector32f samples = generate_binomial_samples(true_mean, 150);
     
-    SequenceCheckingCapital gambler(0.05f, 0.5f, 100);
-    AdaptiveBetting<SequenceCheckingCapital> ab(0.5f, 0.08f, 100, gambler);
+    AdaptiveBetting<SequenceCheckingCapital> ab(0.5f, 0.08f, 100);
     
     ab.submit_samples(samples);
     auto [est, used] = ab.finalize();
