@@ -10,21 +10,7 @@
 
 namespace betting {
 
-// Touch flags for adaptive betting direction detection
-enum class Touch : Int32 { None = 0, Lower = 1, Upper = 2, Both = 3 };
 
-inline Touch operator|(Touch a, Touch b) {
-    return static_cast<Touch>(static_cast<Int32>(a) | static_cast<Int32>(b));
-}
-
-inline Touch& operator|=(Touch& a, Touch b) {
-    a = a | b;
-    return a;
-}
-
-inline Touch operator&(Touch a, Touch b) {
-    return static_cast<Touch>(static_cast<Int32>(a) & static_cast<Int32>(b));
-}
 
 /**
  * @brief Adaptive betting strategy with dynamic confidence interval refinement.
@@ -68,14 +54,14 @@ public:
           delta_(delta),
           grid_num_(grid_num),
           stride_(1.0f / static_cast<Float32>(grid_num)),
-          l_(std::max(0.0f, prior_mean - delta)),
-          u_(std::min(1.0f, prior_mean + delta)),
-          li_(static_cast<Int32>(std::round(l_ * grid_num))),
-          ui_(static_cast<Int32>(std::round(u_ * grid_num))),
-          touch_(Touch::None),
-          phase_(Phase::DirectionDetection),
-          estimated_mean_(prior_mean),
-          finalized_(false) {}
+          win_(2.0f * delta)
+    {
+        Float32 l = std::min(std::max(prior_mean - delta, 0.0f), 1.0f - 2.0f * delta);
+        l_ = l;
+        u_ = l + 2.0f * delta;
+        li_ = static_cast<Int32>(std::round(l_ * grid_num));
+        ui_ = static_cast<Int32>(std::round(u_ * grid_num));
+    }
 
     /**
      * @brief Submit a single sample for processing.
@@ -176,24 +162,25 @@ public:
      * Allows reusing the same instance with the same parameters but fresh state.
      */
     void reset() {
-        l_ = std::max(0.0f, prior_mean_ - delta_);
-        u_ = std::min(1.0f, prior_mean_ + delta_);
+        Float32 l = std::min(std::max(prior_mean_ - delta_, 0.0f), 1.0f - 2.0f * delta_);
+        l_ = l;
+        u_ = l + 2.0f * delta_;
         li_ = static_cast<Int32>(std::round(l_ * grid_num_));
         ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
-        touch_ = Touch::None;
+        touch_ = -1;
         phase_ = Phase::DirectionDetection;
+        s2_is_up_ = false;
         estimated_mean_ = prior_mean_;
         finalized_ = false;
-        // Reset internal gambler with same initial parameters
         gambler_.reset(prior_mean_, 0.25f, 1);
     }
 
 private:
     // Phases of the adaptive betting algorithm
     enum class Phase {
-        DirectionDetection = 0,
-        BoundsRefinement = 1,
-        FinalEstimation = 2
+        DirectionDetection,
+        BoundsRefinement,
+        FinalEstimation
     };
 
     CapitalProcess gambler_;  // Internally owned gambler
@@ -203,90 +190,243 @@ private:
     const Float32 delta_;
     const Int32 grid_num_;
     const Float32 stride_;
+    const Float32 win_;
     
     // Current state
     Float32 l_;           // Lower bound
     Float32 u_;           // Upper bound
     Int32 li_;            // Lower bound index
     Int32 ui_;            // Upper bound index
-    Touch touch_;         // Touch flags
-    Phase phase_;         // Current algorithm phase
-    Float32 estimated_mean_;  // Current estimated mean
-    bool finalized_;      // Whether algorithm has completed
+    Int32 touch_ = -1;    // Touch flags: -1=none, 0=lower, 1=upper, 2=both
+    Phase phase_ = Phase::DirectionDetection;
+    bool s2_is_up_ = false;  // Direction for state 2 refinement
+    Float32 estimated_mean_ = 0.0f;
+    bool finalized_ = false;
 
     /**
-     * @brief Process direction detection phase for single sample.
+     * @brief State 1: direction detection with bounds refinement.
+     * 
+     * Tests both the lower and upper bounds with both capital twins.
+     * On detection, immediately performs binary search to nail down the 
+     * tight bound, then switches to state 2.
+     * 
+     * Matches Python's advance_betting_s1 logic.
      */
-    bool process_direction_detection() {
-        // Test if we've touched either boundary
-        if ((touch_ & Touch::Lower) == Touch::None) {
-            if (bet_on(gambler_, l_, li_, 0)) {
-                touch_ |= Touch::Lower;
+    void process_direction_detection() {
+        // Test both bounds with both twins simultaneously (which=2)
+        if (touch_ != 2 && touch_ != 0) {
+            // Test lower bound: both twins
+            if (bet_on(gambler_, l_, li_, 2)) {
+                touch_ = 0;
+            }
+        }
+        if (touch_ != 2 && touch_ != 1) {
+            // Test upper bound: both twins
+            if (bet_on(gambler_, u_, ui_, 2)) {
+                touch_ += 2;
             }
         }
 
-        if ((touch_ & Touch::Upper) == Touch::None) {
-            if (bet_on(gambler_, u_, ui_, 1)) {
-                touch_ |= Touch::Upper;
+        if (touch_ == -1) {
+            return;  // No direction detected yet, need more samples
+        }
+
+        if (touch_ == 2) {
+            // Both bounds touched simultaneously - double-check for overshoot
+            auto& cct = gambler_.cum_cap_twins();
+            Float64 cap_l_pos = cct(li_, 0);
+            Float64 cap_l_neg = cct(li_, 1);
+            Int32 which_l = (cap_l_pos > cap_l_neg) ? 0 : 1;
+            Float64 cap_u_pos = cct(ui_, 0);
+            Float64 cap_u_neg = cct(ui_, 1);
+            Int32 which_u = (cap_u_pos > cap_u_neg) ? 0 : 1;
+
+            if (which_l == which_u) {
+                // Overshoot: both rejected in same direction, slide window
+                touch_ = which_l;
+                Float32 width = win_ + stride_;
+                Int32 w_stride = static_cast<Int32>(std::round(width * grid_num_));
+
+                if (which_l == 1) {
+                    // Both above the mean, slide down
+                    li_ = static_cast<Int32>(std::round(l_ * grid_num_));
+                    while (l_ >= 0.0f) {
+                        l_ -= width;
+                        li_ -= w_stride;
+                        if (!bet_on(gambler_, l_, li_, 1)) {
+                            if (!bet_on(gambler_, l_, li_, 0)) {
+                                touch_ = 1;
+                            }
+                            break;
+                        }
+                    }
+                    if (l_ < 0.0f) {
+                        l_ = 0.0f;
+                    }
+                    u_ = std::min(l_ + width, 1.0f);
+                } else {
+                    // Both below the mean, slide up
+                    ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
+                    while (u_ <= 1.0f) {
+                        u_ += width;
+                        ui_ += w_stride;
+                        if (!bet_on(gambler_, u_, ui_, 0)) {
+                            if (!bet_on(gambler_, u_, ui_, 1)) {
+                                touch_ = 0;
+                            }
+                            break;
+                        }
+                        if (u_ > 1.0f) break;
+                    }
+                    if (u_ > 1.0f) {
+                        u_ = 1.0f;
+                    }
+                    l_ = std::max(u_ - width, 0.0f);
+                }
+
+                if (touch_ == 2) {
+                    phase_ = Phase::FinalEstimation;
+                    process_final_estimation();
+                    return;
+                }
             }
         }
 
-        // If either boundary touched, move to refinement phase
-        if (touch_ != Touch::None) {
-            phase_ = Phase::BoundsRefinement;
-        }
-
-        return false;
-    }
-
-
-    /**
-     * @brief Process bounds refinement phase for single sample.
-     */
-    bool process_bounds_refinement() {
-        if (li_ + 1 >= ui_) {
-            // Interval is already tight enough
-            phase_ = Phase::FinalEstimation;
-            return process_final_estimation();
-        }
-
-        Int32 mid = (li_ + ui_) / 2;
-        Float32 m = mid * stride_;
-
-        if (touch_ == Touch::Lower) {
-            // Refining lower bound
-            if (bet_on(gambler_, m, mid, 0)) {
-                // Midpoint rejected as lower bound
-                li_ = mid;
-            } else {
-                // Midpoint still plausible
-                ui_ = mid;
+        if (touch_ == 0) {
+            // Lower bound rejected, binary search for tight lower bound
+            li_ = static_cast<Int32>(std::round(l_ * grid_num_));
+            ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
+            while (li_ + 1 < ui_) {
+                Int32 mid = (li_ + ui_) / 2;
+                if (bet_on(gambler_, mid * stride_, mid, 0)) {
+                    li_ = mid;
+                } else {
+                    ui_ = mid;
+                }
             }
-        } else if (touch_ == Touch::Upper) {
-            // Refining upper bound
-            if (bet_on(gambler_, m, mid, 1)) {
-                // Midpoint rejected as upper bound
-                ui_ = mid;
-            } else {
-                // Midpoint still plausible
-                li_ = mid;
-            }
-        } else if (touch_ == Touch::Both) {
-            // Both bounds touched - interval is already tight
-            phase_ = Phase::FinalEstimation;
-            return process_final_estimation();
-        }
-
-        // Update bounds based on indices
-        if (touch_ == Touch::Lower) {
             l_ = ui_ * stride_;
-        } else if (touch_ == Touch::Upper) {
-            u_ = li_ * stride_;
+            u_ = l_ + win_;
+            if (u_ > 1.0f || bet_on(gambler_, u_, static_cast<Int32>(std::round(u_ * grid_num_)), 1)) {
+                touch_ = 2;
+                u_ = std::min(u_, 1.0f);
+                phase_ = Phase::FinalEstimation;
+                process_final_estimation();
+                return;
+            }
+        } else if (touch_ == 1) {
+            // Upper bound rejected, binary search for tight upper bound
+            li_ = static_cast<Int32>(std::round(l_ * grid_num_));
+            ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
+            while (li_ + 1 < ui_) {
+                Int32 mid = (li_ + ui_) / 2;
+                if (bet_on(gambler_, mid * stride_, mid, 1)) {
+                    ui_ = mid;
+                } else {
+                    li_ = mid;
+                }
+            }
+            u_ = std::min(li_ * stride_, 1.0f);
+            l_ = std::max(u_ - win_, 0.0f);
+            if (l_ == 0.0f || bet_on(gambler_, l_, static_cast<Int32>(std::round(l_ * grid_num_)), 0)) {
+                touch_ = 2;
+                phase_ = Phase::FinalEstimation;
+                process_final_estimation();
+                return;
+            }
         }
 
-        return false;
+        // Move to state 2
+        s2_is_up_ = (touch_ == 0);
+        phase_ = Phase::BoundsRefinement;
     }
 
+    /**
+     * @brief State 2 up: find terminal upper bound by sliding window upward.
+     * 
+     * Matches Python's advance_betting_s2_up logic.
+     */
+    bool process_bounds_refinement_up() {
+        Float32 width = win_ + stride_;
+        Int32 i_stride = static_cast<Int32>(std::round(width / stride_));
+
+        ui_ = static_cast<Int32>(std::round(u_ / stride_));
+        while (u_ <= 1.0f) {
+            if (!bet_on(gambler_, u_, ui_, 0)) {
+                l_ = u_ - win_;
+                break;
+            }
+            u_ += width;
+            ui_ += i_stride;
+        }
+        if (u_ >= 1.0f) {
+            l_ = u_ - width;
+            u_ = 1.0f;
+            return true;
+        }
+
+        Int32 mi = static_cast<Int32>(std::round(l_ * grid_num_));
+        while (l_ < 1.0f - width && bet_on(gambler_, l_, mi, 0)) {
+            l_ += stride_;
+            mi += 1;
+        }
+        u_ = std::min(l_ + win_, 1.0f);
+        bool flag = false;
+        if (u_ == 1.0f || bet_on(gambler_, u_, static_cast<Int32>(std::round(u_ * grid_num_)), 1)) {
+            flag = true;
+        }
+        return flag;
+    }
+
+    /**
+     * @brief State 2 down: find terminal lower bound by sliding window downward.
+     * 
+     * Matches Python's advance_betting_s2_down logic.
+     */
+    bool process_bounds_refinement_down() {
+        Float32 width = win_ + stride_;
+        Int32 i_stride = static_cast<Int32>(std::round(width / stride_));
+
+        li_ = static_cast<Int32>(std::round(l_ / stride_));
+        while (l_ >= 0.0f) {
+            if (!bet_on(gambler_, l_, li_, 1)) {
+                u_ = l_ + win_;
+                break;
+            }
+            l_ -= width;
+            li_ -= i_stride;
+        }
+
+        if (l_ <= 0.0f) {
+            u_ = l_ + width;
+            l_ = 0.0f;
+            return true;
+        }
+
+        Int32 mi = static_cast<Int32>(std::round(u_ * grid_num_));
+        while (bet_on(gambler_, u_, mi, 1)) {
+            u_ -= stride_;
+            mi -= 1;
+        }
+        l_ = std::max(u_ - win_, 0.0f);
+        bool flag = false;
+        if (l_ == 0.0f || bet_on(gambler_, l_, static_cast<Int32>(std::round(l_ * grid_num_)), 0)) {
+            flag = true;
+        }
+        return flag;
+    }
+
+    /**
+     * @brief Process bounds refinement phase (state 2).
+     */
+    void process_bounds_refinement() {
+        bool done = s2_is_up_ ? process_bounds_refinement_up()
+                              : process_bounds_refinement_down();
+
+        if (done) {
+            phase_ = Phase::FinalEstimation;
+            process_final_estimation();
+        }
+    }
 
     /**
      * @brief Process final estimation phase.
