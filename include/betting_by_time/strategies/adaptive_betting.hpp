@@ -224,11 +224,17 @@ private:
         while (low_idx + 1 < high_idx) {
             Int32 mid = (low_idx + high_idx) / 2;
             if (bet_on(gambler_, mid * stride_, mid, twin_idx)) {
-                if (twin_idx == 0) low_idx = mid;
-                else high_idx = mid;
+                if (twin_idx == 0) {
+                    low_idx = mid;
+                } else {
+                    high_idx = mid;
+                }
             } else {
-                if (twin_idx == 0) high_idx = mid;
-                else low_idx = mid;
+                if (twin_idx == 0) {
+                    high_idx = mid;
+                } else {
+                    low_idx = mid;
+                }
             }
         }
         return (twin_idx == 0) ? high_idx : low_idx;
@@ -251,11 +257,15 @@ private:
                 l_ -= width;
                 li_ -= w_stride;
                 if (!bet_on(gambler_, l_, li_, 1)) {
-                    if (!bet_on(gambler_, l_, li_, 0)) touch_ = Touch::Upper;
+                    if (!bet_on(gambler_, l_, li_, 0)) {
+                        touch_ = Touch::Upper;
+                    }
                     break;
                 }
             }
-            if (l_ < 0.0f) l_ = 0.0f;
+            if (l_ < 0.0f) {
+                l_ = 0.0f;
+            }
             u_ = std::min(l_ + width, 1.0f);
         } else {
             // Both below the mean, slide up
@@ -264,11 +274,15 @@ private:
                 u_ += width;
                 ui_ += w_stride;
                 if (!bet_on(gambler_, u_, ui_, 0)) {
-                    if (!bet_on(gambler_, u_, ui_, 1)) touch_ = Touch::Lower;
+                    if (!bet_on(gambler_, u_, ui_, 1)) {
+                        touch_ = Touch::Lower;
+                    }
                     break;
                 }
             }
-            if (u_ > 1.0f) u_ = 1.0f;
+            if (u_ > 1.0f) {
+                u_ = 1.0f;
+            }
             l_ = std::max(u_ - width, 0.0f);
         }
     }
