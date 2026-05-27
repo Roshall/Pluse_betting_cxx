@@ -54,14 +54,14 @@ target_link_libraries(betting_by_time PUBLIC
     Eigen3::Eigen
 )
 
-# Release mode optimizations
-target_compile_options(betting_by_time PRIVATE
+# Release mode optimizations - PUBLIC to ensure consistent template instantiation
+target_compile_options(betting_by_time PUBLIC
     $<$<CONFIG:Release>:-O3 -march=native>
     $<$<CONFIG:RelWithDebInfo>:-O2 -g>
 )
 
-# Define EIGEN_NO_DEBUG for release builds
-target_compile_definitions(betting_by_time PRIVATE
+# Define EIGEN_NO_DEBUG for release builds - PUBLIC to avoid ODR violations
+target_compile_definitions(betting_by_time PUBLIC
     $<$<CONFIG:Release>:EIGEN_NO_DEBUG>
 )
 
