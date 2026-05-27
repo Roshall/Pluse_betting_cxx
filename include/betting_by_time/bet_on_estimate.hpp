@@ -32,21 +32,19 @@ template<typename CapitalProcess>
 bool bet_on(CapitalProcess& gambler, Float32 m, Int32 mi, Int32 which = 2) {
     auto& cum_cap_twins = gambler.cum_cap_twins();
     auto& cum_cap_pos = gambler.cum_cap_pos();
-    // Helper to convert scalar or map samples into an Eigen::Map<Vector32f>
-    auto to_map = [&](auto &v) -> Eigen::Map<Vector32f> {
-        using T = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<T, Eigen::Map<Vector32f>>) {
-            return v;
+    auto update_capital = [&](auto sample_value, Float64 cum_cap, Float32 capital) {
+        if constexpr (std::is_same_v<CapitalProcess, SequenceCheckingCapital>) {
+            return seq_single_bet_on(gambler.trunc_scale(), m, sample_value, cum_cap, capital);
         } else {
-            return Eigen::Map<Vector32f>(&v, 1);
+            return geo_single_bet_on(gambler.trunc_scale(), m, sample_value, cum_cap, capital);
         }
     };
+    const Float64 threshold = (which == 2) ? static_cast<Float64>(gambler.threshold()) * 2.0
+                                            : static_cast<Float64>(gambler.threshold());
 
     // Per-hypothesis accessors for positions and twin capitals
     auto old_pos = [&](Int32 j) -> Int32& { return cum_cap_pos(mi, j); };
     auto cum_cap_twin = [&](Int32 j) -> Float64& { return cum_cap_twins(mi, j); };
-    Float32 trunc_scale = gambler.trunc_scale();
-    Float32 threshold = gambler.threshold() * 2.0f;
     Int32 cap_size = gambler.s_ptr();
     
     if (which == 2) {
@@ -62,13 +60,9 @@ bool bet_on(CapitalProcess& gambler, Float32 m, Int32 mi, Int32 which = 2) {
             
             // Process samples from old position to catch up
             for (Int32 i = old_pos(idx); i < old_pos(fidx); ++i) {
-                auto sample_tmp = gambler.sample(i);
-                auto sample_map = to_map(sample_tmp);
                 Float32 capital = gambler.capitals()(i);
 
-                cum_cap = geo_single_bet_on(trunc_scale, m,
-                                           sample_map,
-                                           cum_cap, capital);
+                cum_cap = update_capital(gambler.sample(i), cum_cap, capital);
             }
             
             cum_cap_twin(idx) = cum_cap;
@@ -84,20 +78,11 @@ bool bet_on(CapitalProcess& gambler, Float32 m, Int32 mi, Int32 which = 2) {
         Float64 cap_n = cum_cap_twin(1);
         
         for (Int32 i = old_pos(fidx); i < cap_size; ++i) {
-            auto sample_tmp = gambler.sample(i);
-            auto sample_map = to_map(sample_tmp);
             Float32 capital = gambler.capitals()(i);
 
-            // Update positive twin (bet on mean > m)
-            cap_p = geo_single_bet_on(trunc_scale, m,
-                                     sample_map,
-                                     cap_p, capital);
+            cap_p = update_capital(gambler.sample(i), cap_p, capital);
+            cap_n = update_capital(gambler.sample(i), cap_n, -capital);
 
-            // Update negative twin (bet on mean < m)
-            cap_n = geo_single_bet_on(trunc_scale, m,
-                                     sample_map,
-                                     cap_n, -capital);
-            
             // Early exit if threshold exceeded
             if (std::max(cap_p, cap_n) > threshold) {
                 break;
@@ -114,16 +99,11 @@ bool bet_on(CapitalProcess& gambler, Float32 m, Int32 mi, Int32 which = 2) {
     }
     // Update only one twin
     Float64& cum_cap = cum_cap_twin(which);
-        
     for (Int32 i = old_pos(which); i < cap_size; ++i) {
-        auto sample_tmp = gambler.sample(i);
-        auto sample_map = to_map(sample_tmp);
         Float32 capital = gambler.capitals()(i);
 
-        cum_cap = geo_single_bet_on(trunc_scale, m,
-                                    sample_map,
-                                    cum_cap,
-                                    which == 0 ? capital : -capital);
+        cum_cap = update_capital(gambler.sample(i), cum_cap,
+                                 which == 0 ? capital : -capital);
             
         // Early exit if threshold exceeded
         if (cum_cap > threshold) {
@@ -133,7 +113,6 @@ bool bet_on(CapitalProcess& gambler, Float32 m, Int32 mi, Int32 which = 2) {
         
     cum_cap_twin(which) = cum_cap;
     old_pos(which) = cap_size;
-        
     return cum_cap > threshold;
 }
 
@@ -165,33 +144,34 @@ Float32 estimate(CapitalProcess& gambler, Float32 l, Float32 u) {
     
     Int32 grid_num = gambler.grid_num();
     Float32 stride = 1.0f / grid_num;
-    
+
     if (u - l < stride) {
-        // Range too small
         return l;
     }
-    
-    // Convert float bounds to integer grid indices (inclusive)
-    Int32 li = static_cast<Int32>(std::ceil(l * grid_num));
-    Int32 ui = static_cast<Int32>(std::floor(u * grid_num));
 
-    if (ui < li) {
+    // Match Python behavior: shift l by one stride, then round indices
+    Float32 l_shift = l + stride;
+    Int32 li = static_cast<Int32>(std::round(l_shift * grid_num));
+    Int32 ui = static_cast<Int32>(std::round(u * grid_num));
+
+    if (ui <= li) {
         return (l + u) / 2.0f;
     }
 
-    // Batch bet on all hypotheses in range [li, ui]
-    for (Int32 pi = li; pi <= ui; ++pi) {
+    // Batch bet on all hypotheses in range [li, ui) (Python uses range(li, ui))
+    for (Int32 pi = li; pi < ui; ++pi) {
         bet_on(gambler, static_cast<Float32>(pi) * stride, pi, 2);
     }
 
-    // Find index with minimum sum of twin capitals
+    // Find index with minimum sum of twin capitals over [li, ui)
     auto& cum_cap_twins = gambler.cum_cap_twins();
-    Vector64d sums = cum_cap_twins.block(li, 0, ui - li + 1, 2).rowwise().sum();
+    Int32 len = ui - li;
+    Vector64d sums = cum_cap_twins.block(li, 0, len, 2).rowwise().sum();
 
     Eigen::Index min_idx;
     sums.minCoeff(&min_idx);
 
-    return static_cast<Float32>(li + min_idx) / static_cast<Float32>(grid_num);
+    return l_shift + static_cast<Float32>(min_idx) * stride;
 }
 
 /**

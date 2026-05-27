@@ -72,13 +72,7 @@ inline Float64 seq_single_bet_on(Float32 trunc_scale, Float32 m,
                                   lower_bound,
                                   upper_bound);
 
-    Float64 earn = 1.0 + lbd_m * (sample_f64 - m_f64);
-
-    if (earn < 0.0) {
-        earn = 0.5;
-    }
-
-    return cum_cap * earn;
+    return cum_cap * (1.0 + lbd_m * (sample_f64 - m_f64));
 }
 
 } // namespace betting
