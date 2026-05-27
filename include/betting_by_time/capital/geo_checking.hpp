@@ -51,7 +51,7 @@ public:
           capitals_(Vector32f::Zero(1000)),
           samples_(Vector32f::Zero(sample_num)),
           s_pos_(Vector32i::Zero(1000)),
-          cap_mine_(prior_mean, prior_var, num, alpha * 0.5f),
+          cap_mine_(prior_mean, prior_var, static_cast<Float32>(num), alpha * 0.5f),
           trunc_scale_(trunc_scale),
           threshold_(1.0f / alpha),
           grid_num_(grid_num),
@@ -64,7 +64,7 @@ public:
      * 
      * @return Int32 Maximum number of samples
      */
-    Int32 capacity() const {
+    [[nodiscard]] Int32 capacity() const {
         return static_cast<Int32>(samples_.size());
     }
 
@@ -80,7 +80,7 @@ public:
         cum_cap_twins_.setOnes();
         capitals_.setZero();
         s_ptr_ = 0;
-        cap_mine_.reset(prior_mean, prior_var, num);
+        cap_mine_.reset(prior_mean, prior_var, static_cast<Float32>(num));
         samples_.setZero();
         s_pos_.setZero();
         s_pos_(0) = 0;
@@ -104,14 +104,13 @@ public:
      */
     Eigen::Map<Vector32f> sample(Int32 idx) {
         Int32 start = s_pos_(idx);
-        Int32 end = s_pos_(idx + 1);
-        return Eigen::Map<Vector32f>(&samples_(start), end - start);
+        return {&samples_(start), s_pos_(idx + 1) - start};
     }
 
     /**
      * @brief Add a single sample to the process.
      * 
-     * @param samples Sample value
+     * @param sample Sample value
      */
     void add_sample(Float32 sample) {
         Vector32f sample_batch(1);
@@ -125,7 +124,7 @@ public:
      * @param samples Sample batch
      */
     void add_sample(const Vector32f& samples) {
-        Int32 start = s_pos_(s_ptr_);
+        const Int32 start = s_pos_(s_ptr_);
         samples_.segment(start, samples.size()) = samples;
         capitals_(s_ptr_) = cap_mine_.advance(&samples_(start), samples.size());
         s_ptr_ += 1;
@@ -146,7 +145,7 @@ public:
      * 
      * @return Float32 Latest capital
      */
-    Float32 lat_capital() const {
+    [[nodiscard]] Float32 lat_capital() const {
         return capitals_(s_ptr_ - 1);
     }
 

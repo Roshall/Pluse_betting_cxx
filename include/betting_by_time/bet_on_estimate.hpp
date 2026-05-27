@@ -77,8 +77,8 @@ bool bet_on(CapitalProcess& gambler, Float32 m, Int32 mi, Int32 which = 2) {
         }
         
         // Now advance both from the front position to current size
-        Int32 fidx = (old_pos(0) == old_pos(1)) ? 0 : 
-                     ((old_pos(0) < old_pos(1)) ? 1 : 0);
+        Int32 fidx = old_pos(0) == old_pos(1) ? 0 :
+                     old_pos(0) < old_pos(1) ? 1 : 0;
         
         Float64 cap_p = cum_cap_twin(0);
         Float64 cap_n = cum_cap_twin(1);
@@ -111,31 +111,30 @@ bool bet_on(CapitalProcess& gambler, Float32 m, Int32 mi, Int32 which = 2) {
         
         return std::max(cap_p, cap_n) > threshold;
         
-    } else {
-        // Update only one twin
-        Float64& cum_cap = cum_cap_twin(which);
-        
-        for (Int32 i = old_pos(which); i < cap_size; ++i) {
-            auto sample_tmp = gambler.sample(i);
-            auto sample_map = to_map(sample_tmp);
-            Float32 capital = gambler.capitals()(i);
-
-            cum_cap = geo_single_bet_on(trunc_scale, m,
-                                       sample_map,
-                                       cum_cap,
-                                       (which == 0) ? capital : -capital);
-            
-            // Early exit if threshold exceeded
-            if (cum_cap > threshold) {
-                break;
-            }
-        }
-        
-        cum_cap_twin(which) = cum_cap;
-        old_pos(which) = cap_size;
-        
-        return cum_cap > threshold;
     }
+    // Update only one twin
+    Float64& cum_cap = cum_cap_twin(which);
+        
+    for (Int32 i = old_pos(which); i < cap_size; ++i) {
+        auto sample_tmp = gambler.sample(i);
+        auto sample_map = to_map(sample_tmp);
+        Float32 capital = gambler.capitals()(i);
+
+        cum_cap = geo_single_bet_on(trunc_scale, m,
+                                    sample_map,
+                                    cum_cap,
+                                    which == 0 ? capital : -capital);
+            
+        // Early exit if threshold exceeded
+        if (cum_cap > threshold) {
+            break;
+        }
+    }
+        
+    cum_cap_twin(which) = cum_cap;
+    old_pos(which) = cap_size;
+        
+    return cum_cap > threshold;
 }
 
 /**

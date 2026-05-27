@@ -19,6 +19,9 @@ using Float64 = double;
 /// @brief 32-bit integer type (matches numpy int32)
 using Int32 = int32_t;
 
+/// @brief 64-bit integer type
+using Int64 = int64_t;
+
 // Eigen-based types replacing NumPy arrays
 
 /// @brief 1D vector of Float32 values

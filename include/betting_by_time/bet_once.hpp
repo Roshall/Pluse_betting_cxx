@@ -4,6 +4,7 @@
 #include "betting_by_time/core/types.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cassert>
 
 namespace betting {
 
@@ -25,14 +26,17 @@ inline Float64 geo_single_bet_on(Float32 trunc_scale, Float32 m,
     if (cum_cap < 1e-16) return cum_cap;
     
     // Compute bet limits
-    Float32 lower_bound = -trunc_scale / (1.0f + 1e-9f - m);
-    Float32 upper_bound = trunc_scale / (m + 1e-9f);
-    Float32 bet = std::clamp(capital, lower_bound, upper_bound);
+    const auto m_f64 = static_cast<Float64>(m);
+    const Float64 lower_bound =
+        -static_cast<Float64>(trunc_scale) / (1.0 + 1e-9 - m_f64);
+    const Float64 upper_bound =
+        static_cast<Float64>(trunc_scale) / (m_f64 + 1e-9);
+    const Float64 bet = std::clamp(static_cast<Float64>(capital), lower_bound, upper_bound);
     
     // Vectorized computation: product of (1 + (samples - m) * bet)
-    Float64 product = static_cast<Float64>(
-        (1.0f + (samples.array() - m) * bet).prod()
-    );
+    const Float64 product =
+        (1.0 + (samples.cast<Float64>().array() - m_f64) * bet).prod();
+    assert(product >= 0.0 && "Product of earnings should be non-negative");
     
     return cum_cap * product;
 }
@@ -50,22 +54,30 @@ inline Float64 geo_single_bet_on(Float32 trunc_scale, Float32 m,
 inline Float64 seq_single_bet_on(Float32 trunc_scale, Float32 m, 
                                   Float32 sample,
                                   Float64 cum_cap, Float32 capital) {
-    sample = std::clamp(sample, 0.0f, 1.0f);
-    
-    if (std::abs(sample - m) < 1e-9f || std::abs(cum_cap) < 1e-16) {
+
+
+
+    const auto sample_f64 = static_cast<Float64>(sample);
+    const auto m_f64 = static_cast<Float64>(m);
+
+    if (std::abs(sample_f64 - m_f64) < 1e-9 || std::abs(cum_cap) < 1e-16) {
         return cum_cap;
     }
-    
-    Float32 lbd_m = std::clamp(capital,
-                               -trunc_scale / (1.0f + 1e-9f - m),
-                               trunc_scale / (m + 1e-9f));
-    
-    Float64 earn = 1.0 + static_cast<Float64>(lbd_m) * static_cast<Float64>(sample - m);
-    
+
+    const auto trunc_f64 = static_cast<Float64>(trunc_scale);
+    const auto lower_bound = -trunc_f64 / (1.0 + 1e-9 - m_f64);
+    const auto upper_bound = trunc_f64 / (m_f64 + 1e-9);
+
+    const auto lbd_m = std::clamp(static_cast<Float64>(capital),
+                                  lower_bound,
+                                  upper_bound);
+
+    Float64 earn = 1.0 + lbd_m * (sample_f64 - m_f64);
+
     if (earn < 0.0) {
         earn = 0.5;
     }
-    
+
     return cum_cap * earn;
 }
 

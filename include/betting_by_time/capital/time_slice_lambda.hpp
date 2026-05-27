@@ -22,7 +22,7 @@ private:
     Float32 c_;             ///< Confidence constant (depends on alpha)
     Float32 lbd_cum_;       ///< Cumulative lambda
     Float32 lbd2_cum_;      ///< Cumulative lambda squared
-    Int32 t_;               ///< Time step counter
+    Float32 t_;               ///< Time step counter
 
 public:
     /**
@@ -33,10 +33,10 @@ public:
      * @param num Initial time step (default: 1)
      * @param alpha Confidence parameter (default: 0.05)
      */
-    TimeSliceOptLambda(Float32 prior_mean = 0.5f,
-                       Float32 prior_var = 0.25f,
-                       Int32 num = 1,
-                       Float32 alpha = 0.05f)
+    explicit TimeSliceOptLambda(Float32 prior_mean = 0.5f,
+                                Float32 prior_var = 0.25f,
+                                Float32 num = 1,
+                                Float32 alpha = 0.05f)
         : cum_(prior_mean * num),
           cum_diff2_(prior_var * num),
           c_(cal_c(alpha)),
@@ -51,9 +51,9 @@ public:
      * @param prior_var New prior variance
      * @param num Initial time step
      */
-    void reset(Float32 prior_mean, Float32 prior_var, Int32 num) {
+    void reset(Float32 prior_mean, Float32 prior_var, Float32 num) {
         cum_diff2_ = prior_var * num;
-        Float32 lbd = std::sqrt(c_ / cum_diff2_);
+        const Float32 lbd = std::sqrt(c_ / cum_diff2_);
         lbd_cum_ = lbd * num;
         lbd2_cum_ = lbd_cum_ * lbd;
         t_ = num - 1;
@@ -76,27 +76,25 @@ public:
      * @param n Number of samples
      * @return The computed lambda value for this step
      */
-    Float32 advance(const Float32* samples, Int32 n) {
+    Float32 advance(const Float32* samples, Float32 n) {
         t_ += n;
-        Int32 t = t_;
+        const Float32 t = t_;
         
         // Update cumulative statistics using Eigen
-        Eigen::Map<const Eigen::VectorXf> sample_vec(samples, n);
-        Float32 sum = sample_vec.sum();
-        cum_ += sum;
+        Eigen::Map<const Eigen::VectorXf> sample_vec(samples, static_cast<Int32>(n));
+        cum_ += sample_vec.sum();
         
         // Update cumulative squared differences using Eigen
-        Float32 mean = cum_ / t;
-        Eigen::VectorXf centered = sample_vec.array() - mean;
+        const Eigen::VectorXf centered = sample_vec.array() - cum_ / t;
         cum_diff2_ += centered.squaredNorm();
         
         // Compute optimal lambda
-        Float32 sigma2 = cum_diff2_ / t;
-        Float32 a = sigma2 * lbd2_cum_ + c_;
-        Float32 b = lbd_cum_ / n;
+        const Float32 sigma2 = cum_diff2_ / t;
+        const Float32 a = sigma2 * lbd2_cum_ + c_;
+        const Float32 b = lbd_cum_ / n;
         
         // lambda* formula from the paper
-        Float32 lbd = std::sqrt(b * b + a / (sigma2 * n)) - b;
+        const Float32 lbd = std::sqrt(b * b + a / (sigma2 * n)) - b;
         
         // Update cumulative lambdas
         lbd_cum_ += lbd * n;
@@ -106,12 +104,12 @@ public:
     }
 
     // Getters
-    Float32 cum() const { return cum_; }
-    Float32 cum_diff2() const { return cum_diff2_; }
-    Float32 c() const { return c_; }
-    Float32 lbd_cum() const { return lbd_cum_; }
-    Float32 lbd2_cum() const { return lbd2_cum_; }
-    Int32 t() const { return t_; }
+    [[nodiscard]] Float32 cum() const { return cum_; }
+    [[nodiscard]] Float32 cum_diff2() const { return cum_diff2_; }
+    [[nodiscard]] Float32 c() const { return c_; }
+    [[nodiscard]] Float32 lbd_cum() const { return lbd_cum_; }
+    [[nodiscard]] Float32 lbd2_cum() const { return lbd2_cum_; }
+    [[nodiscard]] Int32 t() const { return static_cast<Int32>(t_); }
 };
 
 } // namespace betting

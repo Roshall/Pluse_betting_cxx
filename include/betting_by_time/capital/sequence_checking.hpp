@@ -47,7 +47,7 @@ public:
                                      Int32 sample_num = 100100)
         : cum_cap_twins_(Matrix64d::Ones(grid_num + 1, 2)),
           cum_cap_pos_(Matrix32i::Zero(grid_num + 1, 2)),
-          cap_mine_(prior_mean, prior_var, num, alpha * 0.5f),
+          cap_mine_(prior_mean, prior_var, static_cast<Float32>(num), alpha * 0.5f),
           trunc_scale_(trunc_scale),
           threshold_(1.0f / alpha),
           samples_(Vector32f::Zero(sample_num)),
@@ -60,7 +60,7 @@ public:
      * 
      * @return Int32 Maximum number of samples
      */
-    Int32 capacity() const {
+    [[nodiscard]] Int32 capacity() const {
         return static_cast<Int32>(samples_.size());
     }
 
@@ -77,7 +77,7 @@ public:
         s_ptr_ = 0;
         cum_cap_pos_.setZero();
         cum_cap_twins_.setOnes();
-        cap_mine_.reset(prior_mean, prior_diff2, num);
+        cap_mine_.reset(prior_mean, prior_diff2, static_cast<Float32>(num));
     }
 
     /**
@@ -91,22 +91,12 @@ public:
     }
 
     /**
-     * @brief Placeholder for candidate setting (not used).
-     * 
-     * @param cand Candidate value (unused)
-     */
-    void set_cand(Float32 cand) {
-        // No-op for sequence checking
-        (void)cand;
-    }
-
-    /**
      * @brief Get a sample by index.
      * 
      * @param idx Sample index
      * @return Float32 Sample value
      */
-    Float32 sample(Int32 idx) const {
+    [[nodiscard]] Float32 sample(Int32 idx) const {
         return samples_(idx);
     }
 
@@ -115,7 +105,7 @@ public:
      * 
      * @return Float32 Last sample value
      */
-    Float32 last_sample() const {
+    [[nodiscard]] Float32 last_sample() const {
         return samples_(s_ptr_ - 1);
     }
 
@@ -197,19 +187,19 @@ public:
     }
 
     // Accessors
-    const Matrix64d& cum_cap_twins() const { return cum_cap_twins_; }
+    [[nodiscard]] const Matrix64d& cum_cap_twins() const { return cum_cap_twins_; }
     Matrix64d& cum_cap_twins() { return cum_cap_twins_; }
 
-    const Matrix32i& cum_cap_pos() const { return cum_cap_pos_; }
+    [[nodiscard]] const Matrix32i& cum_cap_pos() const { return cum_cap_pos_; }
     Matrix32i& cum_cap_pos() { return cum_cap_pos_; }
 
-    const Vector32f& capitals() const { return capitals_; }
+    [[nodiscard]] const Vector32f& capitals() const { return capitals_; }
     Vector32f& capitals() { return capitals_; }
 
-    Int32 s_ptr() const { return s_ptr_; }
-    Float32 trunc_scale() const { return trunc_scale_; }
-    Float32 threshold() const { return threshold_; }
-    Int32 grid_num() const { return grid_num_; }
+    [[nodiscard]] Int32 s_ptr() const { return s_ptr_; }
+    [[nodiscard]] Float32 trunc_scale() const { return trunc_scale_; }
+    [[nodiscard]] Float32 threshold() const { return threshold_; }
+    [[nodiscard]] Int32 grid_num() const { return grid_num_; }
 };
 
 } // namespace betting
