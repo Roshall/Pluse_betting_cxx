@@ -298,17 +298,11 @@ private:
      */
     void process_direction_detection() {
         // Test both bounds with both twins simultaneously (which=2)
-        if (touch_ != Touch::Both && touch_ != Touch::Lower) {
-            // Test lower bound: both twins
-            if (bet_on(gambler_, l_, li_, 2)) {
-                touch_ = Touch::Lower;
-            }
+        if (bet_on(gambler_, l_, li_, 2)) {
+            touch_ = Touch::Lower;
         }
-        if (touch_ != Touch::Both && touch_ != Touch::Upper) {
-            // Test upper bound: both twins
-            if (bet_on(gambler_, u_, ui_, 2)) {
-                touch_ = (touch_ == Touch::Lower) ? Touch::Both : Touch::Upper;
-            }
+        if (bet_on(gambler_, u_, ui_, 2)) {
+            touch_ = (touch_ == Touch::Lower) ? Touch::Both : Touch::Upper;
         }
 
         if (touch_ == Touch::None) {
