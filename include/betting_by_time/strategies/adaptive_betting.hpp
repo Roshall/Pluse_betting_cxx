@@ -47,14 +47,16 @@ public:
                     Float32 gambler_prior_mean = 0.5f,
                     Float32 gambler_prior_var = 0.25f,
                     Int32 gambler_num = 1,
-                    Int32 gambler_sample_num = 100100)
+                  Int32 gambler_sample_num = 100100,
+                  Mode mode = Mode::Estimate)
         : gambler_(gambler_alpha, gambler_trunc_scale, grid_num, gambler_prior_mean,
                    gambler_prior_var, gambler_num, gambler_sample_num),
           prior_mean_(prior_mean),
           delta_(delta),
           grid_num_(grid_num),
           stride_(1.0f / static_cast<Float32>(grid_num)),
-          win_(2.0f * delta)
+            win_(2.0f * delta),
+            mode_(mode)
     {
         Float32 l = std::min(std::max(prior_mean - delta, 0.0f), 1.0f - 2.0f * delta);
         l_ = l;
@@ -167,7 +169,7 @@ public:
         u_ = l + 2.0f * delta_;
         li_ = static_cast<Int32>(std::round(l_ * grid_num_));
         ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
-        touch_ = -1;
+        touch_ = Touch::None;
         phase_ = Phase::DirectionDetection;
         s2_is_up_ = false;
         estimated_mean_ = prior_mean_;
@@ -197,11 +199,18 @@ private:
     Float32 u_;           // Upper bound
     Int32 li_;            // Lower bound index
     Int32 ui_;            // Upper bound index
-    Int32 touch_ = -1;    // Touch flags: -1=none, 0=lower, 1=upper, 2=both
+    enum class Touch : Int32 {
+        None = -1,
+        Lower = 0,
+        Upper = 1,
+        Both = 2
+    };
+    Touch touch_ = Touch::None;    // Touch state for direction detection
     Phase phase_ = Phase::DirectionDetection;
     bool s2_is_up_ = false;  // Direction for state 2 refinement
     Float32 estimated_mean_ = 0.0f;
     bool finalized_ = false;
+    const Mode mode_;
 
     /**
      * @brief Perform binary search to find a tight bound.
@@ -231,7 +240,7 @@ private:
      * @param which Direction of overshoot (0=below mean, 1=above mean)
      */
     void resolve_overshoot(Int32 which) {
-        touch_ = which;
+        touch_ = static_cast<Touch>(which);
         Float32 width = win_ + stride_;
         Int32 w_stride = static_cast<Int32>(std::round(width * grid_num_));
 
@@ -242,7 +251,7 @@ private:
                 l_ -= width;
                 li_ -= w_stride;
                 if (!bet_on(gambler_, l_, li_, 1)) {
-                    if (!bet_on(gambler_, l_, li_, 0)) touch_ = 1;
+                    if (!bet_on(gambler_, l_, li_, 0)) touch_ = Touch::Upper;
                     break;
                 }
             }
@@ -255,7 +264,7 @@ private:
                 u_ += width;
                 ui_ += w_stride;
                 if (!bet_on(gambler_, u_, ui_, 0)) {
-                    if (!bet_on(gambler_, u_, ui_, 1)) touch_ = 0;
+                    if (!bet_on(gambler_, u_, ui_, 1)) touch_ = Touch::Lower;
                     break;
                 }
             }
@@ -275,24 +284,24 @@ private:
      */
     void process_direction_detection() {
         // Test both bounds with both twins simultaneously (which=2)
-        if (touch_ != 2 && touch_ != 0) {
+        if (touch_ != Touch::Both && touch_ != Touch::Lower) {
             // Test lower bound: both twins
             if (bet_on(gambler_, l_, li_, 2)) {
-                touch_ = 0;
+                touch_ = Touch::Lower;
             }
         }
-        if (touch_ != 2 && touch_ != 1) {
+        if (touch_ != Touch::Both && touch_ != Touch::Upper) {
             // Test upper bound: both twins
             if (bet_on(gambler_, u_, ui_, 2)) {
-                touch_ += 2;
+                touch_ = (touch_ == Touch::Lower) ? Touch::Both : Touch::Upper;
             }
         }
 
-        if (touch_ == -1) {
+        if (touch_ == Touch::None) {
             return;  // No direction detected yet, need more samples
         }
 
-        if (touch_ == 2) {
+        if (touch_ == Touch::Both) {
             // Both bounds touched simultaneously - double-check for overshoot
             auto& cct = gambler_.cum_cap_twins();
             Float64 cap_l_pos = cct(li_, 0);
@@ -306,16 +315,21 @@ private:
                 // Overshoot: both rejected in same direction, slide window
                 resolve_overshoot(which_l);
 
-                if (touch_ == 2) {
-                    phase_ = Phase::FinalEstimation;
-                    process_final_estimation();
+                if (touch_ == Touch::Both) {
+                    if (mode_ == Mode::Estimate) {
+                        phase_ = Phase::FinalEstimation;
+                        process_final_estimation();
+                    } else {
+                        s2_is_up_ = (which_l == 0);
+                        phase_ = Phase::BoundsRefinement;
+                    }
                     return;
                 }
             }
         }
 
-        if (touch_ == 0 || touch_ == 1) {
-            Int32 twin_idx = touch_;
+        if (touch_ == Touch::Lower || touch_ == Touch::Upper) {
+            Int32 twin_idx = static_cast<Int32>(touch_);
             li_ = static_cast<Int32>(std::round(l_ * grid_num_));
             ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
             Int32 target_idx = binary_search_bound(li_, ui_, twin_idx);
@@ -325,9 +339,14 @@ private:
                 l_ = target_idx * stride_;
                 u_ = std::min(l_ + win_, 1.0f);
                 if (u_ == 1.0f || bet_on(gambler_, u_, static_cast<Int32>(std::round(u_ * grid_num_)), 1)) {
-                    touch_ = 2;
-                    phase_ = Phase::FinalEstimation;
-                    process_final_estimation();
+                    touch_ = Touch::Both;
+                    if (mode_ == Mode::Estimate) {
+                        phase_ = Phase::FinalEstimation;
+                        process_final_estimation();
+                    } else {
+                        s2_is_up_ = true;
+                        phase_ = Phase::BoundsRefinement;
+                    }
                     return;
                 }
             } else {
@@ -335,16 +354,21 @@ private:
                 u_ = std::min(target_idx * stride_, 1.0f);
                 l_ = std::max(u_ - win_, 0.0f);
                 if (l_ == 0.0f || bet_on(gambler_, l_, static_cast<Int32>(std::round(l_ * grid_num_)), 0)) {
-                    touch_ = 2;
-                    phase_ = Phase::FinalEstimation;
-                    process_final_estimation();
+                    touch_ = Touch::Both;
+                    if (mode_ == Mode::Estimate) {
+                        phase_ = Phase::FinalEstimation;
+                        process_final_estimation();
+                    } else {
+                        s2_is_up_ = false;
+                        phase_ = Phase::BoundsRefinement;
+                    }
                     return;
                 }
             }
         }
 
         // Move to state 2
-        s2_is_up_ = (touch_ == 0);
+        s2_is_up_ = (touch_ == Touch::Lower);
         phase_ = Phase::BoundsRefinement;
     }
 
@@ -424,9 +448,7 @@ private:
      * @brief Process bounds refinement phase (state 2).
      */
     void process_bounds_refinement() {
-        bool done = process_bounds_refinement_dir(s2_is_up_);
-
-        if (done) {
+        if (process_bounds_refinement_dir(s2_is_up_) && mode_ == Mode::Estimate) {
             phase_ = Phase::FinalEstimation;
             process_final_estimation();
         }
@@ -436,9 +458,13 @@ private:
      * @brief Process final estimation phase.
      */
     bool process_final_estimation() {
-        estimated_mean_ = estimate(gambler_, l_, u_);
+        if (mode_ == Mode::Estimate) {
+            estimated_mean_ = estimate(gambler_, l_, u_);
 
-        if (estimated_mean_ < 0.0f) {
+            if (estimated_mean_ < 0.0f) {
+                estimated_mean_ = (l_ + u_) / 2.0f;
+            }
+        } else {
             estimated_mean_ = (l_ + u_) / 2.0f;
         }
 
@@ -482,20 +508,21 @@ using SequenceAdaptiveBetting = AdaptiveBetting<SequenceCheckingCapital>;
  */
 template<typename CapitalProcess>
 std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
-                                            Float32 prior_mean,
-                                            Float32 delta,
-                                            Int32 grid_num,
-                                            const std::vector<Int32>& breakpoints = {},
-                                            Float32 gambler_alpha = 0.05f,
-                                            Float32 gambler_trunc_scale = 0.5f,
-                                            Float32 gambler_prior_mean = 0.5f,
-                                            Float32 gambler_prior_var = 0.25f,
-                                            Int32 gambler_num = 1,
-                                            Int32 gambler_sample_num = 100100) {
+                                           Float32 prior_mean,
+                                           Float32 delta,
+                                           Int32 grid_num,
+                                           const std::vector<Int32>& breakpoints = {},
+                                           Float32 gambler_alpha = 0.05f,
+                                           Float32 gambler_trunc_scale = 0.5f,
+                                           Float32 gambler_prior_mean = 0.5f,
+                                           Float32 gambler_prior_var = 0.25f,
+                                           Int32 gambler_num = 1,
+                                           Int32 gambler_sample_num = 100100,
+                                           Mode mode = Mode::Estimate) {
     AdaptiveBetting<CapitalProcess> ab(prior_mean, delta, grid_num, 
                                        gambler_alpha, gambler_trunc_scale,
                                        gambler_prior_mean, gambler_prior_var,
-                                       gambler_num, gambler_sample_num);
+                                       gambler_num, gambler_sample_num, mode);
     
     if (breakpoints.empty()) {
         // No breakpoints provided, submit all samples at once
@@ -524,40 +551,42 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
  * @brief Convenience wrapper for GeoCheckingCapital.
  */
 inline std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
-                                                   Float32 prior_mean,
-                                                   Float32 delta,
-                                                   Int32 grid_num,
-                                                   const std::vector<Int32>& breakpoints = {},
-                                                   Float32 gambler_alpha = 0.05f,
-                                                   Float32 gambler_trunc_scale = 0.5f,
-                                                   Float32 gambler_prior_mean = 0.5f,
-                                                   Float32 gambler_prior_var = 0.25f,
-                                                   Int32 gambler_num = 1,
-                                                   Int32 gambler_sample_num = 100100) {
+                                                  Float32 prior_mean,
+                                                  Float32 delta,
+                                                  Int32 grid_num,
+                                                  const std::vector<Int32>& breakpoints = {},
+                                                  Float32 gambler_alpha = 0.05f,
+                                                  Float32 gambler_trunc_scale = 0.5f,
+                                                  Float32 gambler_prior_mean = 0.5f,
+                                                  Float32 gambler_prior_var = 0.25f,
+                                                  Int32 gambler_num = 1,
+                                                  Int32 gambler_sample_num = 100100,
+                                                  Mode mode = Mode::Estimate) {
     return adaptive_betting<GeoCheckingCapital>(samples, prior_mean, delta, 
-                                                 grid_num, breakpoints, gambler_alpha, gambler_trunc_scale,
-                                                 gambler_prior_mean, gambler_prior_var,
-                                                 gambler_num, gambler_sample_num);
+                                                grid_num, breakpoints, gambler_alpha, gambler_trunc_scale,
+                                                gambler_prior_mean, gambler_prior_var,
+                                                gambler_num, gambler_sample_num, mode);
 }
 
 /**
  * @brief Convenience wrapper for SequenceCheckingCapital.
  */
 inline std::pair<Float32, Int32> adaptive_betting_sequence(const Vector32f& samples,
-                                                            Float32 prior_mean,
-                                                            Float32 delta,
-                                                            Int32 grid_num,
-                                                            const std::vector<Int32>& breakpoints = {},
-                                                            Float32 gambler_alpha = 0.05f,
-                                                            Float32 gambler_trunc_scale = 0.5f,
-                                                            Float32 gambler_prior_mean = 0.5f,
-                                                            Float32 gambler_prior_var = 0.25f,
-                                                            Int32 gambler_num = 1,
-                                                            Int32 gambler_sample_num = 100100) {
+                                                           Float32 prior_mean,
+                                                           Float32 delta,
+                                                           Int32 grid_num,
+                                                           const std::vector<Int32>& breakpoints = {},
+                                                           Float32 gambler_alpha = 0.05f,
+                                                           Float32 gambler_trunc_scale = 0.5f,
+                                                           Float32 gambler_prior_mean = 0.5f,
+                                                           Float32 gambler_prior_var = 0.25f,
+                                                           Int32 gambler_num = 1,
+                                                           Int32 gambler_sample_num = 100100,
+                                                           Mode mode = Mode::Estimate) {
     return adaptive_betting<SequenceCheckingCapital>(samples, prior_mean, delta, 
-                                                      grid_num, breakpoints, gambler_alpha, gambler_trunc_scale,
-                                                      gambler_prior_mean, gambler_prior_var,
-                                                      gambler_num, gambler_sample_num);
+                                                     grid_num, breakpoints, gambler_alpha, gambler_trunc_scale,
+                                                     gambler_prior_mean, gambler_prior_var,
+                                                     gambler_num, gambler_sample_num, mode);
 }
 
 } // namespace betting

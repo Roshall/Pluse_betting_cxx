@@ -47,7 +47,8 @@ public:
                    Float32 gambler_prior_mean = 0.5f,
                    Float32 gambler_prior_var = 0.25f,
                    Int32 gambler_num = 1,
-                   Int32 gambler_sample_num = 100010)
+                   Int32 gambler_sample_num = 100010,
+                   Mode mode = Mode::Estimate)
         : gambler_(gambler_alpha, gambler_trunc_scale, grid_num, gambler_prior_mean, 
                    gambler_prior_var, gambler_num, gambler_sample_num),
           prior_mean_(prior_mean),
@@ -61,7 +62,8 @@ public:
           samples_used_(0),
           finalized_(false),
           estimated_mean_(prior_mean),
-          phase_(Phase::Running) {
+                    phase_(Phase::Running),
+                    mode_(mode) {
         cs_bound_ << 0.0f, 1.0f;
     }
 
@@ -89,7 +91,9 @@ public:
 
             if (new_indices.empty()) {
                 samples_used_ = i + 1;
-                finalize_internal();
+                if (mode_ == Mode::Estimate) {
+                    finalize_internal();
+                }
                 return;
             }
 
@@ -100,7 +104,7 @@ public:
 
             intersect(cs_bound_, m_possible(rang_idx_(0)), m_possible(rang_idx_(rang_idx_.size() - 1)));
 
-            if (cs_bound_(1) - cs_bound_(0) < eps_) {
+            if (mode_ == Mode::Estimate && cs_bound_(1) - cs_bound_(0) < eps_) {
                 samples_used_ = i + 1;
                 finalize_internal();
                 return;
@@ -108,7 +112,9 @@ public:
         }
 
         samples_used_ = i;
-        finalize_internal();
+        if (mode_ == Mode::Estimate) {
+            finalize_internal();
+        }
     }
 
     Float32 get_lower_bound() const { return cs_bound_(0); }
@@ -151,11 +157,16 @@ private:
     bool finalized_;
     Float32 estimated_mean_;
     Phase phase_;
+    const Mode mode_;
 
     void finalize_internal() {
-        Vector64d final_sums = gambler_.cum_cap_twins().rowwise().sum();
-        Int32 min_idx = argmin(final_sums);
-        estimated_mean_ = static_cast<Float32>(min_idx) / grid_num_;
+        if (mode_ == Mode::Estimate) {
+            Vector64d final_sums = gambler_.cum_cap_twins().rowwise().sum();
+            Int32 min_idx = argmin(final_sums);
+            estimated_mean_ = static_cast<Float32>(min_idx) / grid_num_;
+        } else {
+            estimated_mean_ = (cs_bound_(0) + cs_bound_(1)) / 2.0f;
+        }
         finalized_ = true;
         phase_ = Phase::FinalEstimation;
     }
@@ -164,20 +175,21 @@ private:
 // Convenience function that matches previous free-function signature
 template<typename CapitalProcess>
 std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
-                                           Float32 prior_mean,
-                                           Float32 delta,
-                                           Int32 grid_num,
-                                           const std::vector<Int32>& breakpoints = {},
-                                           Float32 gambler_alpha = 0.05f,
-                                           Float32 gambler_trunc_scale = 0.5f,
-                                           Float32 gambler_prior_mean = 0.5f,
-                                           Float32 gambler_prior_var = 0.25f,
-                                           Int32 gambler_num = 1,
-                                           Int32 gambler_sample_num = 100010) {
+                                          Float32 prior_mean,
+                                          Float32 delta,
+                                          Int32 grid_num,
+                                          const std::vector<Int32>& breakpoints = {},
+                                          Float32 gambler_alpha = 0.05f,
+                                          Float32 gambler_trunc_scale = 0.5f,
+                                          Float32 gambler_prior_mean = 0.5f,
+                                          Float32 gambler_prior_var = 0.25f,
+                                          Int32 gambler_num = 1,
+                                          Int32 gambler_sample_num = 100010,
+                                          Mode mode = Mode::Estimate) {
     VanillaBetting<CapitalProcess> vb(prior_mean, delta, grid_num, 
                                       gambler_alpha, gambler_trunc_scale,
                                       gambler_prior_mean, gambler_prior_var,
-                                      gambler_num, gambler_sample_num);
+                               gambler_num, gambler_sample_num, mode);
 
     if (breakpoints.empty()) {
         vb.submit_samples(samples);
@@ -209,11 +221,12 @@ inline std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
                                                  Float32 gambler_prior_mean = 0.5f,
                                                  Float32 gambler_prior_var = 0.25f,
                                                  Int32 gambler_num = 1,
-                                                 Int32 gambler_sample_num = 100010) {
+                                                 Int32 gambler_sample_num = 100010,
+                                                 Mode mode = Mode::Estimate) {
     return vanilla_betting<GeoCheckingCapital>(samples, prior_mean, delta, grid_num, 
                                                breakpoints, gambler_alpha, gambler_trunc_scale,
                                                gambler_prior_mean, gambler_prior_var,
-                                               gambler_num, gambler_sample_num);
+                                               gambler_num, gambler_sample_num, mode);
 }
 
 inline std::pair<Float32, Int32> vanilla_betting_sequence(const Vector32f& samples,
@@ -226,11 +239,12 @@ inline std::pair<Float32, Int32> vanilla_betting_sequence(const Vector32f& sampl
                                                           Float32 gambler_prior_mean = 0.5f,
                                                           Float32 gambler_prior_var = 0.25f,
                                                           Int32 gambler_num = 1,
-                                                          Int32 gambler_sample_num = 100100) {
+                                                          Int32 gambler_sample_num = 100100,
+                                                          Mode mode = Mode::Estimate) {
     return vanilla_betting<SequenceCheckingCapital>(samples, prior_mean, delta, grid_num, 
                                                     breakpoints, gambler_alpha, gambler_trunc_scale,
                                                     gambler_prior_mean, gambler_prior_var,
-                                                    gambler_num, gambler_sample_num);
+                                                    gambler_num, gambler_sample_num, mode);
 }
 
 } // namespace betting

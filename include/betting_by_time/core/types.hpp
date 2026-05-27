@@ -10,6 +10,12 @@
  */
 namespace betting {
 
+/// @brief Execution mode for betting strategies.
+enum class Mode {
+	Estimate,
+	Bound
+};
+
 /// @brief Single-precision floating point type (matches numpy float32)
 using Float32 = float;
 
