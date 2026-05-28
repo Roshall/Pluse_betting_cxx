@@ -35,8 +35,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(eigen)
 
+# Library type configuration
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+
 # Create main library target
-add_library(betting_by_time STATIC
+add_library(betting_by_time
     src/utilities.cpp
     include/betting_by_time/capital/geo_checking.hpp
     include/betting_by_time/capital/sequence_checking.hpp
@@ -47,7 +50,8 @@ add_library(betting_by_time STATIC
 )
 
 target_include_directories(betting_by_time PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 target_link_libraries(betting_by_time PUBLIC
@@ -69,3 +73,54 @@ target_compile_definitions(betting_by_time PUBLIC
 add_subdirectory(tests)
 add_subdirectory(benchmarks)
 add_subdirectory(examples)
+
+# Installation configuration
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+# Install the library
+install(TARGETS betting_by_time
+    EXPORT betting_by_timeTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+# Install header files
+install(DIRECTORY include/betting_by_time/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/betting_by_time
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+# Export targets
+install(EXPORT betting_by_timeTargets
+    FILE betting_by_timeTargets.cmake
+    NAMESPACE betting_by_time::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/betting_by_time
+)
+
+# Export Eigen dependency
+install(TARGETS eigen EXPORT eigenTargets)
+install(EXPORT eigenTargets
+    FILE eigenTargets.cmake
+    NAMESPACE Eigen3::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/eigen
+)
+
+# Generate and install package config file
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/betting_by_timeConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/betting_by_timeConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/betting_by_timeConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/betting_by_time
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/betting_by_timeConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/betting_by_timeConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/betting_by_time
+)
