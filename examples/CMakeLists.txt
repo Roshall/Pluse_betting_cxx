@@ -1,10 +1,10 @@
 # Examples CMakeLists.txt
 
-add_executable(basic_usage
+add_executable(betting_basic_usage
     basic_usage.cpp
 )
 
-target_link_libraries(basic_usage PRIVATE 
+target_link_libraries(betting_basic_usage PRIVATE 
     betting_by_time
 )
 

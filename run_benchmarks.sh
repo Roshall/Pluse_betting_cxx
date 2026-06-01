@@ -16,8 +16,8 @@ if [ ! -d "$BUILD_DIR" ]; then
     echo "Build directory not found. Building first..."
     mkdir -p $BUILD_DIR
     cd $BUILD_DIR
-    cmake .. -DCMAKE_BUILD_TYPE=Release
-    make betting_benchmarks -j$(nproc)
+    cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja
+    cmake --build . --target betting_benchmarks -j$(nproc)
     cd ..
 fi
 
@@ -25,8 +25,8 @@ fi
 if [ ! -f "$BENCHMARK_BIN" ]; then
     echo "Benchmark binary not found. Building..."
     cd $BUILD_DIR
-    cmake .. -DCMAKE_BUILD_TYPE=Release
-    make betting_benchmarks -j$(nproc)
+    cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja
+    cmake --build . --target betting_benchmarks -j$(nproc)
     cd ..
 fi
 

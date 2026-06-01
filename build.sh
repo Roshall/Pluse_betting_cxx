@@ -32,12 +32,12 @@ cmake .. -DCMAKE_BUILD_TYPE=Release \
 # Build
 echo ""
 echo "Building..."
-make -j$(nproc)
+cmake --build . -j$(nproc)
 
 # Install
 echo ""
 echo "Installing to ../dist..."
-make install
+cmake --install .
 
 echo ""
 echo "=== Build Complete ==="
