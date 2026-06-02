@@ -121,13 +121,13 @@ public:
     Float32 get_upper_bound() const { return cs_bound_(1); }
     Float32 get_interval_width() const { return cs_bound_(1) - cs_bound_(0); }
     Float32 get_estimated_mean() const { return estimated_mean_; }
-    Int32 get_samples_used() const { return samples_used_; }
+    Int32 get_samples_used() const { return gambler_.used_sample_num(); }
     bool is_finalized() const { return finalized_; }
     Int32 get_current_phase() const { return static_cast<Int32>(phase_); }
 
     std::pair<Float32, Int32> finalize() {
         if (!finalized_) finalize_internal();
-        return std::make_pair(estimated_mean_, samples_used_);
+        return std::make_pair(estimated_mean_, get_samples_used());
     }
 
     void reset() {

@@ -132,7 +132,7 @@ public:
     /**
      * @brief Get the number of samples used so far.
      */
-    Int32 get_samples_used() const { return gambler_.s_ptr(); }
+    Int32 get_samples_used() const { return gambler_.used_sample_num(); }
 
     /**
      * @brief Check if the algorithm has completed.

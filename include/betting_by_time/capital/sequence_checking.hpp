@@ -197,6 +197,8 @@ public:
     Vector32f& capitals() { return capitals_; }
 
     [[nodiscard]] Int32 s_ptr() const { return s_ptr_; }
+    [[nodiscard]] Int32 used_sample_num() const { return s_ptr_; }
+    
     [[nodiscard]] Float32 trunc_scale() const { return trunc_scale_; }
     [[nodiscard]] Float32 threshold() const { return threshold_; }
     [[nodiscard]] Int32 grid_num() const { return grid_num_; }
