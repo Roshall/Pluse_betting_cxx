@@ -399,6 +399,14 @@ private:
                 mi -= 1;
             }
         }
+        if (refine_up) {
+            l_ = bound;
+            u_ = std::min(l_ + win_, 1.0f);
+        } else {
+            u_ = bound;
+            l_ = std::max(u_ - win_, 0.0f);
+        }
+            
     }
 
     /**
@@ -429,7 +437,6 @@ private:
                 return true;
             }
             refine_bound_sequentially(true);
-            u_ = std::min(l_ + win_, 1.0f);
             return u_ == 1.0f || bet_on(gambler_, u_, static_cast<Int32>(std::round(u_ * grid_num_)), 1);
         } else {
             li_ = static_cast<Int32>(std::round(l_ / stride_));
@@ -445,9 +452,8 @@ private:
                 l_ = 0.0f;
                 u_ = std::min(l_ + width, 1.0f);
                 return true;
-            }
+            } 
             refine_bound_sequentially(false);
-            l_ = std::max(u_ - win_, 0.0f);
             return l_ == 0.0f || bet_on(gambler_, l_, static_cast<Int32>(std::round(l_ * grid_num_)), 0);
         }
     }
