@@ -113,9 +113,11 @@ public:
      * @param sample Sample value
      */
     void add_sample(Float32 sample) {
-        Vector32f sample_batch(1);
-        sample_batch(0) = sample;
-        add_sample(sample_batch);
+        const Int32 start = s_pos_(s_ptr_);
+        samples_(start) = sample;
+        capitals_(s_ptr_) = cap_mine_.advance(&samples_(start), 1);
+        s_ptr_ += 1;
+        s_pos_(s_ptr_) = start + 1;
     }
 
     /**
