@@ -58,8 +58,6 @@ public:
           eps_(delta * 2.0f - 1.0f / grid_num),
           cs_bound_(),
           threshold_(gambler_.threshold() * 2.0f),
-          rang_idx_(Vector32i::LinSpaced(grid_num + 1, 0, grid_num)),
-          samples_used_(0),
           finalized_(false),
           estimated_mean_(prior_mean),
                     phase_(Phase::Running),
@@ -75,45 +73,26 @@ public:
 
     void submit_samples(const Vector32f& samples) {
         if (finalized_) return;
+        gambler_.advance(samples, m_possible);
 
-        Int32 i = 0;
-        for (i = 0; i < samples.size(); ++i) {
-            gambler_.advance(samples(i), m_possible);
+        Vector64d cap_sums = gambler_.cum_cap_twins().rowwise().sum();
 
-            Vector64d cap_sums = gambler_.cum_cap_twins().rowwise().sum();
-
-            std::vector<Int32> new_indices;
-            for (Int32 j = 0; j < cap_sums.size(); ++j) {
-                if (cap_sums(j) < threshold_) {
-                    new_indices.push_back(j);
-                }
-            }
-
-            if (new_indices.empty()) {
-                samples_used_ = i + 1;
-                if (mode_ == Mode::Estimate) {
-                    finalize_internal();
-                }
-                return;
-            }
-
-            rang_idx_.resize(new_indices.size());
-            for (size_t j = 0; j < new_indices.size(); ++j) {
-                rang_idx_(j) = new_indices[j];
-            }
-
-            intersect(cs_bound_, m_possible(rang_idx_(0)), m_possible(rang_idx_(rang_idx_.size() - 1)));
-
-            if (mode_ == Mode::Estimate && cs_bound_(1) - cs_bound_(0) < eps_) {
-                samples_used_ = i + 1;
-                finalize_internal();
-                return;
+        std::vector<Int32> new_indices;
+        for (Int32 i = 0; i < cap_sums.size(); ++i) {
+            if (cap_sums(i) > threshold_) {
+                new_indices.push_back(i);
             }
         }
-
-        samples_used_ = i;
-        if (mode_ == Mode::Estimate) {
+        if (new_indices.empty()) {
             finalize_internal();
+            return;
+        }
+
+        intersect(cs_bound_, m_possible(new_indices.front()), m_possible(new_indices.back()));
+
+        if (mode_ == Mode::Estimate && cs_bound_(1) - cs_bound_(0) < eps_) {
+            finalize_internal();
+            return;
         }
     }
 
@@ -132,8 +111,6 @@ public:
 
     void reset() {
         cs_bound_ << 0.0f, 1.0f;
-        rang_idx_ = Vector32i::LinSpaced(grid_num_ + 1, 0, grid_num_);
-        samples_used_ = 0;
         finalized_ = false;
         estimated_mean_ = prior_mean_;
         phase_ = Phase::Running;
@@ -152,8 +129,6 @@ private:
     const Float32 eps_;
     Array2f cs_bound_;
     const Float32 threshold_;
-    Vector32i rang_idx_;
-    Int32 samples_used_;
     bool finalized_;
     Float32 estimated_mean_;
     Phase phase_;
