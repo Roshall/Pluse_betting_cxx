@@ -45,6 +45,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 # Create main library target
 add_library(betting_by_time
     src/utilities.cpp
+    src/bet_once.cpp
     include/betting_by_time/capital/geo_checking.hpp
     include/betting_by_time/capital/sequence_checking.hpp
     include/betting_by_time/bet_once.hpp
