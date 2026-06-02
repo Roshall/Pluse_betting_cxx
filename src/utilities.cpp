@@ -14,7 +14,7 @@ Vector32i flatnonzero(const Vector32i& vec) {
         }
     }
 
-    return Eigen::Map<Vector32i>(indices.data(), indices.size());
+    return Eigen::Map<Vector32i>(indices.data(), indices.size()).eval();
 }
 Vector32i gen_times(Float32 start, Float32 base, Float32 end) {
     Float32 log_start = std::log(start);
