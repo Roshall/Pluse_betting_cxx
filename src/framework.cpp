@@ -21,8 +21,17 @@ BettingFactoryResult betting_factory(BetStrategy strategy, CapitalType capital) 
                                              Float32 prior_mean,
                                              Float32 delta,
                                              Int32 grid_num,
+                                             const std::vector<Int32>& breakpoints,
+                                             Float32 gambler_alpha,
+                                             Float32 gambler_trunc_scale,
+                                             Float32 gambler_prior_var,
+                                             Int32 gambler_num,
+                                             Int32 gambler_sample_num,
+                                             Mode mode,
                                              [[maybe_unused]] std::any& gambler_any) {
-                        return vanilla_betting(samples, prior_mean, delta, grid_num);
+                        return vanilla_betting(samples, prior_mean, delta, grid_num, breakpoints,
+                                              gambler_alpha, gambler_trunc_scale, gambler_prior_var,
+                                              gambler_num, gambler_sample_num, mode);
                     };
                     
                     return std::make_pair(make_gambler, bet_fn);
@@ -37,8 +46,17 @@ BettingFactoryResult betting_factory(BetStrategy strategy, CapitalType capital) 
                                              Float32 prior_mean,
                                              Float32 delta,
                                              Int32 grid_num,
+                                             const std::vector<Int32>& breakpoints,
+                                             Float32 gambler_alpha,
+                                             Float32 gambler_trunc_scale,
+                                             Float32 gambler_prior_var,
+                                             Int32 gambler_num,
+                                             Int32 gambler_sample_num,
+                                             Mode mode,
                                              [[maybe_unused]] std::any& gambler_any) {
-                        return vanilla_betting_sequence(samples, prior_mean, delta, grid_num);
+                        return vanilla_betting_sequence(samples, prior_mean, delta, grid_num, breakpoints,
+                                                       gambler_alpha, gambler_trunc_scale, gambler_prior_var,
+                                                       gambler_num, gambler_sample_num, mode);
                     };
                     
                     return std::make_pair(make_gambler, bet_fn);
@@ -60,8 +78,17 @@ BettingFactoryResult betting_factory(BetStrategy strategy, CapitalType capital) 
                                              Float32 prior_mean,
                                              Float32 delta,
                                              Int32 grid_num,
+                                             const std::vector<Int32>& breakpoints,
+                                             Float32 gambler_alpha,
+                                             Float32 gambler_trunc_scale,
+                                             Float32 gambler_prior_var,
+                                             Int32 gambler_num,
+                                             Int32 gambler_sample_num,
+                                             Mode mode,
                                              [[maybe_unused]] std::any& gambler_any) {
-                        return adaptive_betting(samples, prior_mean, delta, grid_num);
+                        return adaptive_betting(samples, prior_mean, delta, grid_num, breakpoints,
+                                               gambler_alpha, gambler_trunc_scale, gambler_prior_var,
+                                               gambler_num, gambler_sample_num, mode);
                     };
                     
                     return std::make_pair(make_gambler, bet_fn);
@@ -76,8 +103,17 @@ BettingFactoryResult betting_factory(BetStrategy strategy, CapitalType capital) 
                                              Float32 prior_mean,
                                              Float32 delta,
                                              Int32 grid_num,
+                                             const std::vector<Int32>& breakpoints,
+                                             Float32 gambler_alpha,
+                                             Float32 gambler_trunc_scale,
+                                             Float32 gambler_prior_var,
+                                             Int32 gambler_num,
+                                             Int32 gambler_sample_num,
+                                             Mode mode,
                                              [[maybe_unused]] std::any& gambler_any) {
-                        return adaptive_betting_sequence(samples, prior_mean, delta, grid_num);
+                        return adaptive_betting_sequence(samples, prior_mean, delta, grid_num, breakpoints,
+                                                        gambler_alpha, gambler_trunc_scale, gambler_prior_var,
+                                                        gambler_num, gambler_sample_num, mode);
                     };
                     
                     return std::make_pair(make_gambler, bet_fn);
