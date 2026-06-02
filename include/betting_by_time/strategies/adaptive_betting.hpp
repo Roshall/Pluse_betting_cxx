@@ -31,12 +31,11 @@ public:
     /**
      * @brief Construct an AdaptiveBetting instance with gambler parameters.
      * 
-     * @param prior_mean Prior estimate of the mean
+     * @param prior_mean Prior estimate of the mean (also used as gambler prior mean)
      * @param delta Confidence level parameter (smaller = more confident)
      * @param grid_num Number of grid points for hypothesis testing
      * @param gambler_alpha Delta parameter for gambler (default: 0.05f)
      * @param gambler_trunc_scale Truncation scale for gambler (default: 0.5f)
-     * @param gambler_prior_mean Prior mean for gambler (default: 0.5f)
      * @param gambler_prior_var Prior variance for gambler (default: 0.25f)
      * @param gambler_num Initial time step for gambler (default: 1)
      * @param gambler_sample_num Pre-allocated sample capacity for gambler (default: 100100)
@@ -44,12 +43,11 @@ public:
     AdaptiveBetting(Float32 prior_mean, Float32 delta, Int32 grid_num,
                     Float32 gambler_alpha = 0.05f,
                     Float32 gambler_trunc_scale = 0.5f,
-                    Float32 gambler_prior_mean = 0.5f,
                     Float32 gambler_prior_var = 0.25f,
                     Int32 gambler_num = 1,
                   Int32 gambler_sample_num = 100100,
                   Mode mode = Mode::Estimate)
-        : gambler_(gambler_alpha, gambler_trunc_scale, grid_num, gambler_prior_mean,
+        : gambler_(gambler_alpha, gambler_trunc_scale, grid_num, prior_mean,
                    gambler_prior_var, gambler_num, gambler_sample_num),
           prior_mean_(prior_mean),
           delta_(delta),
@@ -162,9 +160,13 @@ public:
      * @brief Reset the state to initial conditions.
      * 
      * Allows reusing the same instance with the same parameters but fresh state.
+     * 
+     * @param prior_mean Prior mean for gambler
+     * @param prior_var Prior variance for gambler
+     * @param prior_num Initial time step for gambler
      */
-    void reset() {
-        Float32 l = std::min(std::max(prior_mean_ - delta_, 0.0f), 1.0f - 2.0f * delta_);
+    void reset(Float32 prior_mean, Float32 prior_var, Int32 prior_num) {
+        Float32 l = std::min(std::max(prior_mean - delta_, 0.0f), 1.0f - 2.0f * delta_);
         l_ = l;
         u_ = l + 2.0f * delta_;
         li_ = static_cast<Int32>(std::round(l_ * grid_num_));
@@ -172,9 +174,9 @@ public:
         touch_ = Touch::None;
         phase_ = Phase::DirectionDetection;
         s2_is_up_ = false;
-        estimated_mean_ = prior_mean_;
+        estimated_mean_ = prior_mean;
         finalized_ = false;
-        gambler_.reset(prior_mean_, 0.25f, 1);
+        gambler_.reset(prior_mean, prior_var, prior_num);
     }
 
 private:
@@ -528,15 +530,13 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
                                            const std::vector<Int32>& breakpoints = {},
                                            Float32 gambler_alpha = 0.05f,
                                            Float32 gambler_trunc_scale = 0.5f,
-                                           Float32 gambler_prior_mean = 0.5f,
                                            Float32 gambler_prior_var = 0.25f,
                                            Int32 gambler_num = 1,
                                            Int32 gambler_sample_num = 100100,
                                            Mode mode = Mode::Estimate) {
     AdaptiveBetting<CapitalProcess> ab(prior_mean, delta, grid_num, 
                                        gambler_alpha, gambler_trunc_scale,
-                                       gambler_prior_mean, gambler_prior_var,
-                                       gambler_num, gambler_sample_num, mode);
+                                       gambler_prior_var, gambler_num, gambler_sample_num, mode);
     
     if (breakpoints.empty()) {
         // No breakpoints provided, submit all samples at once
@@ -571,15 +571,13 @@ inline std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
                                                   const std::vector<Int32>& breakpoints = {},
                                                   Float32 gambler_alpha = 0.05f,
                                                   Float32 gambler_trunc_scale = 0.5f,
-                                                  Float32 gambler_prior_mean = 0.5f,
                                                   Float32 gambler_prior_var = 0.25f,
                                                   Int32 gambler_num = 1,
                                                   Int32 gambler_sample_num = 100100,
                                                   Mode mode = Mode::Estimate) {
     return adaptive_betting<GeoCheckingCapital>(samples, prior_mean, delta, 
                                                 grid_num, breakpoints, gambler_alpha, gambler_trunc_scale,
-                                                gambler_prior_mean, gambler_prior_var,
-                                                gambler_num, gambler_sample_num, mode);
+                                                gambler_prior_var, gambler_num, gambler_sample_num, mode);
 }
 
 /**
@@ -592,15 +590,13 @@ inline std::pair<Float32, Int32> adaptive_betting_sequence(const Vector32f& samp
                                                            const std::vector<Int32>& breakpoints = {},
                                                            Float32 gambler_alpha = 0.05f,
                                                            Float32 gambler_trunc_scale = 0.5f,
-                                                           Float32 gambler_prior_mean = 0.5f,
                                                            Float32 gambler_prior_var = 0.25f,
                                                            Int32 gambler_num = 1,
                                                            Int32 gambler_sample_num = 100100,
                                                            Mode mode = Mode::Estimate) {
     return adaptive_betting<SequenceCheckingCapital>(samples, prior_mean, delta, 
                                                      grid_num, breakpoints, gambler_alpha, gambler_trunc_scale,
-                                                     gambler_prior_mean, gambler_prior_var,
-                                                     gambler_num, gambler_sample_num, mode);
+                                                     gambler_prior_var, gambler_num, gambler_sample_num, mode);
 }
 
 } // namespace betting

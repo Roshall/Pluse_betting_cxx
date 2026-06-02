@@ -29,12 +29,11 @@ public:
     /**
      * @brief Construct a VanillaBetting instance with gambler parameters.
      * 
-     * @param prior_mean Prior estimate of mean
+     * @param prior_mean Prior estimate of mean (also used as gambler prior mean)
      * @param delta Confidence parameter
      * @param grid_num Number of grid points
      * @param gambler_alpha Delta parameter for gambler (default: 0.05f)
      * @param gambler_trunc_scale Truncation scale for gambler (default: 0.5f)
-     * @param gambler_prior_mean Prior mean for gambler (default: 0.5f)
      * @param gambler_prior_var Prior variance for gambler (default: 0.25f)
      * @param gambler_num Initial time step for gambler (default: 1)
      * @param gambler_sample_num Pre-allocated sample capacity for gambler (default: 100010)
@@ -44,15 +43,12 @@ public:
                    Int32 grid_num,
                    Float32 gambler_alpha = 0.05f,
                    Float32 gambler_trunc_scale = 0.5f,
-                   Float32 gambler_prior_mean = 0.5f,
                    Float32 gambler_prior_var = 0.25f,
                    Int32 gambler_num = 1,
                    Int32 gambler_sample_num = 100010,
                    Mode mode = Mode::Estimate)
-        : gambler_(gambler_alpha, gambler_trunc_scale, grid_num, gambler_prior_mean, 
+        : gambler_(gambler_alpha, gambler_trunc_scale, grid_num, prior_mean, 
                    gambler_prior_var, gambler_num, gambler_sample_num),
-          prior_mean_(prior_mean),
-          delta_(delta),
           grid_num_(grid_num),
           m_possible(linspace(0.0f, 1.0f, grid_num + 1)),
           eps_(delta * 2.0f - 1.0f / grid_num),
@@ -109,21 +105,27 @@ public:
         return std::make_pair(estimated_mean_, get_samples_used());
     }
 
-    void reset() {
+    /**
+     * @brief Reset the state to initial conditions.
+     * 
+     * Allows reusing the same instance with the same parameters but fresh state.
+     * 
+     * @param prior_mean Prior mean for gambler
+     * @param prior_var Prior variance for gambler
+     * @param prior_num Initial time step for gambler
+     */
+    void reset(Float32 prior_mean, Float32 prior_var, Int32 prior_num) {
         cs_bound_ << 0.0f, 1.0f;
         finalized_ = false;
-        estimated_mean_ = prior_mean_;
+        estimated_mean_ = prior_mean;
         phase_ = Phase::Running;
-        // Reset internal gambler with same initial parameters
-        gambler_.reset(prior_mean_, 0.25f, 1);
+        gambler_.reset(prior_mean, prior_var, prior_num);
     }
 
 private:
     enum class Phase { Running = 0, FinalEstimation = 1 };
 
     CapitalProcess gambler_;  // Internally owned gambler
-    const Float32 prior_mean_;
-    const Float32 delta_;
     const Int32 grid_num_;
     const Vector32f m_possible;
     const Float32 eps_;
@@ -156,15 +158,13 @@ std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
                                           const std::vector<Int32>& breakpoints = {},
                                           Float32 gambler_alpha = 0.05f,
                                           Float32 gambler_trunc_scale = 0.5f,
-                                          Float32 gambler_prior_mean = 0.5f,
                                           Float32 gambler_prior_var = 0.25f,
                                           Int32 gambler_num = 1,
                                           Int32 gambler_sample_num = 100010,
                                           Mode mode = Mode::Estimate) {
     VanillaBetting<CapitalProcess> vb(prior_mean, delta, grid_num, 
                                       gambler_alpha, gambler_trunc_scale,
-                                      gambler_prior_mean, gambler_prior_var,
-                               gambler_num, gambler_sample_num, mode);
+                                      gambler_prior_var, gambler_num, gambler_sample_num, mode);
 
     if (breakpoints.empty()) {
         vb.submit_samples(samples);
@@ -193,15 +193,13 @@ inline std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
                                                  const std::vector<Int32>& breakpoints = {},
                                                  Float32 gambler_alpha = 0.05f,
                                                  Float32 gambler_trunc_scale = 0.5f,
-                                                 Float32 gambler_prior_mean = 0.5f,
                                                  Float32 gambler_prior_var = 0.25f,
                                                  Int32 gambler_num = 1,
                                                  Int32 gambler_sample_num = 100010,
                                                  Mode mode = Mode::Estimate) {
     return vanilla_betting<GeoCheckingCapital>(samples, prior_mean, delta, grid_num, 
                                                breakpoints, gambler_alpha, gambler_trunc_scale,
-                                               gambler_prior_mean, gambler_prior_var,
-                                               gambler_num, gambler_sample_num, mode);
+                                               gambler_prior_var, gambler_num, gambler_sample_num, mode);
 }
 
 inline std::pair<Float32, Int32> vanilla_betting_sequence(const Vector32f& samples,
@@ -211,15 +209,13 @@ inline std::pair<Float32, Int32> vanilla_betting_sequence(const Vector32f& sampl
                                                           const std::vector<Int32>& breakpoints = {},
                                                           Float32 gambler_alpha = 0.05f,
                                                           Float32 gambler_trunc_scale = 0.5f,
-                                                          Float32 gambler_prior_mean = 0.5f,
                                                           Float32 gambler_prior_var = 0.25f,
                                                           Int32 gambler_num = 1,
                                                           Int32 gambler_sample_num = 100100,
                                                           Mode mode = Mode::Estimate) {
     return vanilla_betting<SequenceCheckingCapital>(samples, prior_mean, delta, grid_num, 
                                                     breakpoints, gambler_alpha, gambler_trunc_scale,
-                                                    gambler_prior_mean, gambler_prior_var,
-                                                    gambler_num, gambler_sample_num, mode);
+                                                    gambler_prior_var, gambler_num, gambler_sample_num, mode);
 }
 
 } // namespace betting
