@@ -195,7 +195,7 @@ inline std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
                                                  Float32 gambler_trunc_scale = 0.5f,
                                                  Float32 gambler_prior_var = 0.25f,
                                                  Int32 gambler_num = 1,
-                                                 Int32 gambler_sample_num = 100010,
+                                                 Int32 gambler_sample_num = 1000,
                                                  Mode mode = Mode::Estimate) {
     return vanilla_betting<GeoCheckingCapital>(samples, prior_mean, delta, grid_num, 
                                                breakpoints, gambler_alpha, gambler_trunc_scale,
@@ -211,7 +211,7 @@ inline std::pair<Float32, Int32> vanilla_betting_sequence(const Vector32f& sampl
                                                           Float32 gambler_trunc_scale = 0.5f,
                                                           Float32 gambler_prior_var = 0.25f,
                                                           Int32 gambler_num = 1,
-                                                          Int32 gambler_sample_num = 100100,
+                                                          Int32 gambler_sample_num = 1000,
                                                           Mode mode = Mode::Estimate) {
     return vanilla_betting<SequenceCheckingCapital>(samples, prior_mean, delta, grid_num, 
                                                     breakpoints, gambler_alpha, gambler_trunc_scale,
