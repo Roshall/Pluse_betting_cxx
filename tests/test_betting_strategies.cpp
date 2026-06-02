@@ -400,7 +400,7 @@ TEST_CASE("VanillaBetting class - reset functionality", "[class][vanilla]") {
         REQUIRE(vb.is_finalized());
         
         // Reset strategy (gambler state persists)
-        vb.reset();
+        vb.reset(0.5f, 0.25f, 1);
         REQUIRE_FALSE(vb.is_finalized());
         REQUIRE(vb.get_lower_bound() == 0.0f);
         REQUIRE(vb.get_upper_bound() == 1.0f);
@@ -563,7 +563,7 @@ TEST_CASE("AdaptiveBetting class - reset functionality", "[class][adaptive]") {
         REQUIRE(ab.is_finalized());
         
         // Reset strategy (gambler state persists)
-        ab.reset();
+        ab.reset(0.5f, 0.25f, 1);
         REQUIRE_FALSE(ab.is_finalized());
         REQUIRE(ab.get_current_phase() == 0); // Back to DirectionDetection
     }
