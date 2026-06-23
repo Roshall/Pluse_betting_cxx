@@ -48,9 +48,9 @@ public:
                                 Int32 sample_num = 100010)
         : cum_cap_twins_(Matrix64d::Ones(grid_num + 1, 2)),
           cum_cap_pos_(Matrix32i::Zero(grid_num + 1, 2)),
-          capitals_(Vector32f::Zero(1000)),
+          capitals_(Vector32f::Zero(sample_num)),
           samples_(Vector32f::Zero(sample_num)),
-          s_pos_(Vector32i::Zero(1000)),
+          s_pos_(Vector32i::Zero(sample_num + 1)),
           cap_mine_(prior_mean, prior_var, static_cast<Float32>(num), alpha * 0.5f),
           trunc_scale_(trunc_scale),
           threshold_(1.0f / alpha),
