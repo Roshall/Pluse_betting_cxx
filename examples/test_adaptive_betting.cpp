@@ -62,7 +62,15 @@ void run_experiment(const std::string& name,
     
     // Run betting strategy
     auto start_time = std::chrono::high_resolution_clock::now();
-    auto [estimated_mean, samples_used] = bet_fn(samples, prior_mean, delta, grid_num, gambler);
+    // Call updated bet_fn signature: add breakpoints, gambler params, and mode
+    auto [estimated_mean, samples_used] = bet_fn(samples, prior_mean, delta, grid_num,
+                                                std::vector<Int32>{}, // breakpoints
+                                                alpha,                 // gambler_alpha
+                                                trunc_scale,           // gambler_trunc_scale
+                                                0.25f,                 // gambler_prior_var
+                                                1,                     // gambler_num
+                                                grid_num,              // gambler_sample_num
+                                                Mode::Estimate);
     auto end_time = std::chrono::high_resolution_clock::now();
     
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
@@ -183,7 +191,14 @@ int main() {
         }
         
         // Run on accumulated samples
-        auto [est, used] = bet_fn(samples.head(end_idx), prior_mean, delta, grid_num, gambler);
+        auto [est, used] = bet_fn(samples.head(end_idx), prior_mean, delta, grid_num,
+                     std::vector<Int32>{}, // breakpoints
+                     alpha,                 // gambler_alpha
+                     trunc_scale,           // gambler_trunc_scale
+                     0.25f,                 // gambler_prior_var
+                     1,                     // gambler_num
+                     grid_num,              // gambler_sample_num
+                     Mode::Estimate);
         
         std::cout << "  Total samples: " << end_idx << std::endl;
         std::cout << "  Current estimate: " << std::fixed << std::setprecision(4) << est << std::endl;

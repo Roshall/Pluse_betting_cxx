@@ -33,7 +33,7 @@ using AnyGamblerFactory = std::function<std::any(Float32, Float32, Int32)>;
  */
 using AnyBettingFn = std::function<std::pair<Float32, Int32>(
     const Vector32f&, Float32, Float32, Int32, const std::vector<Int32>&,
-    Float32, Float32, Float32, Int32, Int32, Mode, std::any&)>;
+    Float32, Float32, Float32, Int32, Int32, Mode)>;
 
 /**
  * @brief Return type for betting factory
