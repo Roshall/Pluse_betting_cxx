@@ -116,8 +116,7 @@ TEST_CASE("Framework API - vanilla geo factory", "[framework][vanilla]") {
     auto [make_gambler, bet_fn] = vanilla_geo_factory();
     
     Vector32f samples = generate_binomial_samples(0.6f, 100);
-    std::any unused_gambler;
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate, unused_gambler);
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -128,8 +127,7 @@ TEST_CASE("Framework API - vanilla seq factory", "[framework][vanilla]") {
     auto [make_gambler, bet_fn] = vanilla_seq_factory();
     
     Vector32f samples = generate_binomial_samples(0.4f, 100);
-    std::any unused_gambler;
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate, unused_gambler);
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -140,8 +138,7 @@ TEST_CASE("Framework API - adaptive geo factory", "[framework][adaptive]") {
     auto [make_gambler, bet_fn] = adaptive_geo_factory();
 
     Vector32f samples = generate_binomial_samples(0.7f, 150);
-    std::any unused_gambler;
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate, unused_gambler);
+    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);

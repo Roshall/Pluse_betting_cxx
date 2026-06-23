@@ -75,7 +75,7 @@ public:
 
         std::vector<Int32> new_indices;
         for (Int32 i = 0; i < cap_sums.size(); ++i) {
-            if (cap_sums(i) > threshold_) {
+            if (cap_sums(i) < threshold_) {
                 new_indices.push_back(i);
             }
         }

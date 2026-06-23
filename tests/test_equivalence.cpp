@@ -112,7 +112,11 @@ TEST_CASE("Equivalence: vanilla_geo", "[equivalence][vanilla][geo]") {
         for (auto &tc : cases) {
         Vector32f samples(tc.samples.size());
         for (size_t i = 0; i < tc.samples.size(); ++i) samples(i) = tc.samples[i];
-        auto [est, used] = vanilla_betting(samples, tc.prior_mean, tc.delta, tc.grid_num);
+        // Submit samples one-by-one via breakpoints so gambler.s_ptr() counts individual samples
+        std::vector<Int32> breakpoints;
+        breakpoints.reserve(tc.samples.size() + 1);
+        for (Int32 i = 0; i <= static_cast<Int32>(tc.samples.size()); ++i) breakpoints.push_back(i);
+        auto [est, used] = vanilla_betting(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
         CAPTURE(tc.test_id);
         CAPTURE(used);
         CAPTURE(tc.expected_used);
@@ -131,7 +135,11 @@ TEST_CASE("Equivalence: vanilla_seq", "[equivalence][vanilla][seq]") {
         if (dbg != -1 && tc.test_id != dbg) continue;
         Vector32f samples(tc.samples.size());
         for (size_t i = 0; i < tc.samples.size(); ++i) samples(i) = tc.samples[i];
-        auto [est, used] = vanilla_betting_sequence(samples, tc.prior_mean, tc.delta, tc.grid_num);
+        // Submit samples one-by-one via breakpoints so gambler.s_ptr() counts individual samples
+        std::vector<Int32> breakpoints;
+        breakpoints.reserve(tc.samples.size() + 1);
+        for (Int32 i = 0; i <= static_cast<Int32>(tc.samples.size()); ++i) breakpoints.push_back(i);
+        auto [est, used] = vanilla_betting_sequence(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
         REQUIRE(used == tc.expected_used);
         REQUIRE(est == Catch::Approx(tc.expected_mean).margin(1e-5f));
     }
