@@ -7,6 +7,7 @@
 #include "betting_by_time/capital/sequence_checking.hpp"
 #include <cmath>
 #include <algorithm>
+#include <tuple>
 
 namespace betting {
 
@@ -147,13 +148,13 @@ public:
      * 
      * @return Pair of (estimated_mean, samples_used)
      */
-    std::pair<Float32, Int32> finalize() {
+    std::tuple<Float32, Float32, Float32, Int32> finalize() {
         if (!finalized_) {
             // Ensure final estimation is done
             phase_ = Phase::FinalEstimation;
             process_final_estimation();
         }
-        return std::make_pair(estimated_mean_, gambler_.s_ptr());
+        return std::make_tuple(estimated_mean_, l_, u_, gambler_.s_ptr());
     }
 
     /**
@@ -523,7 +524,7 @@ using SequenceAdaptiveBetting = AdaptiveBetting<SequenceCheckingCapital>;
  * careful implementation to maintain statistical guarantees.
  */
 template<typename CapitalProcess>
-std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
+std::tuple<Float32, Float32, Float32, Int32> adaptive_betting(const Vector32f& samples,
                                            Float32 prior_mean,
                                            Float32 delta,
                                            Int32 grid_num,
@@ -564,7 +565,7 @@ std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
 /**
  * @brief Convenience wrapper for GeoCheckingCapital.
  */
-inline std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
+inline std::tuple<Float32, Float32, Float32, Int32> adaptive_betting(const Vector32f& samples,
                                                   Float32 prior_mean,
                                                   Float32 delta,
                                                   Int32 grid_num,
@@ -583,7 +584,7 @@ inline std::pair<Float32, Int32> adaptive_betting(const Vector32f& samples,
 /**
  * @brief Convenience wrapper for SequenceCheckingCapital.
  */
-inline std::pair<Float32, Int32> adaptive_betting_sequence(const Vector32f& samples,
+inline std::tuple<Float32, Float32, Float32, Int32> adaptive_betting_sequence(const Vector32f& samples,
                                                            Float32 prior_mean,
                                                            Float32 delta,
                                                            Int32 grid_num,

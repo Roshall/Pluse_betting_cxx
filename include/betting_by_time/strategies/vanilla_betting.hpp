@@ -5,6 +5,7 @@
 #include "betting_by_time/capital/sequence_checking.hpp"
 #include "betting_by_time/core/types.hpp"
 #include "betting_by_time/core/utilities.hpp"
+#include <tuple>
 
 namespace betting {
 
@@ -100,9 +101,9 @@ public:
     bool is_finalized() const { return finalized_; }
     Int32 get_current_phase() const { return static_cast<Int32>(phase_); }
 
-    std::pair<Float32, Int32> finalize() {
+    std::tuple<Float32, Float32, Float32, Int32> finalize() {
         if (!finalized_) finalize_internal();
-        return std::make_pair(estimated_mean_, get_samples_used());
+        return std::make_tuple(estimated_mean_, cs_bound_(0), cs_bound_(1), get_samples_used());
     }
 
     /**
@@ -151,7 +152,7 @@ private:
 
 // Convenience function that matches previous free-function signature
 template<typename CapitalProcess>
-std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
+std::tuple<Float32, Float32, Float32, Int32> vanilla_betting(const Vector32f& samples,
                                           Float32 prior_mean,
                                           Float32 delta,
                                           Int32 grid_num,
@@ -186,7 +187,7 @@ std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
 }
 
 // Convenience overloads for Geo/Sequence capital processes
-inline std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
+inline std::tuple<Float32, Float32, Float32, Int32> vanilla_betting(const Vector32f& samples,
                                                  Float32 prior_mean,
                                                  Float32 delta,
                                                  Int32 grid_num,
@@ -202,7 +203,7 @@ inline std::pair<Float32, Int32> vanilla_betting(const Vector32f& samples,
                                                gambler_prior_var, gambler_num, gambler_sample_num, mode);
 }
 
-inline std::pair<Float32, Int32> vanilla_betting_sequence(const Vector32f& samples,
+inline std::tuple<Float32, Float32, Float32, Int32> vanilla_betting_sequence(const Vector32f& samples,
                                                           Float32 prior_mean,
                                                           Float32 delta,
                                                           Int32 grid_num,
