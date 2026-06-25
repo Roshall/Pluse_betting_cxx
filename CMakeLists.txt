@@ -39,6 +39,16 @@ if(NOT TARGET Eigen3::Eigen)
     FetchContent_MakeAvailable(eigen)
 endif()
 
+# Fetch pybind11 for Python bindings (only if not already fetched by parent)
+if(NOT TARGET pybind11::module)
+    FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG v3.0.4
+    )
+    FetchContent_MakeAvailable(pybind11)
+endif()
+
 # Library type configuration
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
@@ -73,6 +83,11 @@ target_compile_options(betting_by_time PUBLIC
 target_compile_definitions(betting_by_time PUBLIC
     $<$<CONFIG:Release>:EIGEN_NO_DEBUG>
 )
+
+# Python bindings - always built regardless of subdirectory flags
+pybind11_add_module(betting_by_time_python src/betting_python.cpp)
+target_link_libraries(betting_by_time_python PRIVATE betting_by_time)
+set_target_properties(betting_by_time_python PROPERTIES OUTPUT_NAME "betting_by_time_cxx")
 
 # Add subdirectories
 if(BUILD_TESTS)

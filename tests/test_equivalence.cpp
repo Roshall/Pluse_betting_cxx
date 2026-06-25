@@ -22,6 +22,8 @@ struct TestCase {
     float delta;
     int grid_num;
     float expected_mean;
+    float expected_lower_bound;
+    float expected_upper_bound;
     int expected_used;
     std::vector<float> samples;
 };
@@ -71,9 +73,9 @@ static std::vector<TestCase> read_csv(const std::string& path) {
     }
     if (!cur.empty()) toks.push_back(cur);
 
-    // parse tokens sequentially: test_id, prior_mean, delta, grid_num, expected_mean, expected_used, num_samples, samples...
+    // parse tokens sequentially: test_id, prior_mean, delta, grid_num, expected_mean, expected_lower_bound, expected_upper_bound, expected_used, num_samples, samples...
     size_t idx = 0;
-    while (idx + 7 <= toks.size()) {
+    while (idx + 9 <= toks.size()) {
         TestCase tc;
         try {
             tc.test_id = std::stoi(toks[idx++]);
@@ -81,6 +83,8 @@ static std::vector<TestCase> read_csv(const std::string& path) {
             tc.delta = std::stof(toks[idx++]);
             tc.grid_num = std::stoi(toks[idx++]);
             tc.expected_mean = std::stof(toks[idx++]);
+            tc.expected_lower_bound = std::stof(toks[idx++]);
+            tc.expected_upper_bound = std::stof(toks[idx++]);
             tc.expected_used = std::stoi(toks[idx++]);
             int num_samples = std::stoi(toks[idx++]);
             tc.samples.reserve(num_samples);
@@ -116,14 +120,20 @@ TEST_CASE("Equivalence: vanilla_geo", "[equivalence][vanilla][geo]") {
         std::vector<Int32> breakpoints;
         breakpoints.reserve(tc.samples.size() + 1);
         for (Int32 i = 0; i <= static_cast<Int32>(tc.samples.size()); ++i) breakpoints.push_back(i);
-        auto [est, used] = vanilla_betting(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
+        auto [est, lb, ub, used] = vanilla_betting(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
         CAPTURE(tc.test_id);
         CAPTURE(used);
         CAPTURE(tc.expected_used);
         CAPTURE(est);
         CAPTURE(tc.expected_mean);
+        CAPTURE(lb);
+        CAPTURE(tc.expected_lower_bound);
+        CAPTURE(ub);
+        CAPTURE(tc.expected_upper_bound);
         REQUIRE(used == tc.expected_used);
         REQUIRE(est == Catch::Approx(tc.expected_mean).margin(1e-5f));
+        REQUIRE(lb == Catch::Approx(tc.expected_lower_bound).margin(1e-5f));
+        REQUIRE(ub == Catch::Approx(tc.expected_upper_bound).margin(1e-5f));
     }
 }
 
@@ -139,9 +149,11 @@ TEST_CASE("Equivalence: vanilla_seq", "[equivalence][vanilla][seq]") {
         std::vector<Int32> breakpoints;
         breakpoints.reserve(tc.samples.size() + 1);
         for (Int32 i = 0; i <= static_cast<Int32>(tc.samples.size()); ++i) breakpoints.push_back(i);
-        auto [est, used] = vanilla_betting_sequence(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
+        auto [est, lb, ub, used] = vanilla_betting_sequence(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
         REQUIRE(used == tc.expected_used);
         REQUIRE(est == Catch::Approx(tc.expected_mean).margin(1e-5f));
+        REQUIRE(lb == Catch::Approx(tc.expected_lower_bound).margin(1e-5f));
+        REQUIRE(ub == Catch::Approx(tc.expected_upper_bound).margin(1e-5f));
     }
 }
 
@@ -158,11 +170,13 @@ TEST_CASE("Equivalence: adaptive_geo", "[equivalence][adaptive][geo]") {
         std::vector<Int32> breakpoints;
         breakpoints.reserve(tc.samples.size() + 1);
         for (Int32 i = 0; i <= static_cast<Int32>(tc.samples.size()); ++i) breakpoints.push_back(i);
-        auto [est, used] = adaptive_betting(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
+        auto [est, lb, ub, used] = adaptive_betting(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
         REQUIRE(used == tc.expected_used);
         float grid_step = 1.0f / static_cast<float>(tc.grid_num);
         CAPTURE(grid_step);
         REQUIRE(est == Catch::Approx(tc.expected_mean).margin(grid_step + 1e-6f));
+        REQUIRE(lb == Catch::Approx(tc.expected_lower_bound).margin(grid_step + 1e-6f));
+        REQUIRE(ub == Catch::Approx(tc.expected_upper_bound).margin(grid_step + 1e-6f));
     }
 }
 
@@ -179,10 +193,12 @@ TEST_CASE("Equivalence: adaptive_seq", "[equivalence][adaptive][seq]") {
         std::vector<Int32> breakpoints;
         breakpoints.reserve(tc.samples.size() + 1);
         for (Int32 i = 0; i <= static_cast<Int32>(tc.samples.size()); ++i) breakpoints.push_back(i);
-        auto [est, used] = adaptive_betting_sequence(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
+        auto [est, lb, ub, used] = adaptive_betting_sequence(samples, tc.prior_mean, tc.delta, tc.grid_num, breakpoints);
         REQUIRE(used == tc.expected_used);
         float grid_step = 1.0f / static_cast<float>(tc.grid_num);
         CAPTURE(grid_step);
         REQUIRE(est == Catch::Approx(tc.expected_mean).margin(grid_step + 1e-6f));
+        REQUIRE(lb == Catch::Approx(tc.expected_lower_bound).margin(grid_step + 1e-6f));
+        REQUIRE(ub == Catch::Approx(tc.expected_upper_bound).margin(grid_step + 1e-6f));
     }
 }
