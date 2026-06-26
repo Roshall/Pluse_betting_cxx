@@ -35,7 +35,7 @@ TEST_CASE("Vanilla betting with GeoCheckingCapital", "[strategy][vanilla][geo]")
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
     // Run vanilla betting
-    auto [estimated_mean, samples_used] = vanilla_betting(
+    auto [estimated_mean, lb, ub, samples_used] = vanilla_betting(
         samples, 0.5f, 0.1f, 100
     );
     
@@ -56,7 +56,7 @@ TEST_CASE("Vanilla betting with SequenceCheckingCapital", "[strategy][vanilla][s
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
     // Run vanilla betting
-    auto [estimated_mean, samples_used] = vanilla_betting_sequence(
+    auto [estimated_mean, lb, ub, samples_used] = vanilla_betting_sequence(
         samples, 0.5f, 0.1f, 100
     );
     
@@ -77,7 +77,7 @@ TEST_CASE("Adaptive betting with GeoCheckingCapital", "[strategy][adaptive][geo]
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
     // Run adaptive betting
-    auto [estimated_mean, samples_used] = adaptive_betting(
+    auto [estimated_mean, lb, ub, samples_used] = adaptive_betting(
         samples, 0.5f, 0.08f, 100
     );
     
@@ -98,7 +98,7 @@ TEST_CASE("Adaptive betting with SequenceCheckingCapital", "[strategy][adaptive]
     Vector32f samples = generate_binomial_samples(true_mean, num_samples);
     
     // Run adaptive betting
-    auto [estimated_mean, samples_used] = adaptive_betting_sequence(
+    auto [estimated_mean, lb, ub, samples_used] = adaptive_betting_sequence(
         samples, 0.5f, 0.08f, 100
     );
     
@@ -116,7 +116,7 @@ TEST_CASE("Framework API - vanilla geo factory", "[framework][vanilla]") {
     auto [make_gambler, bet_fn] = vanilla_geo_factory();
     
     Vector32f samples = generate_binomial_samples(0.6f, 100);
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
+    auto [est, lb, ub, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -127,7 +127,7 @@ TEST_CASE("Framework API - vanilla seq factory", "[framework][vanilla]") {
     auto [make_gambler, bet_fn] = vanilla_seq_factory();
     
     Vector32f samples = generate_binomial_samples(0.4f, 100);
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
+    auto [est, lb, ub, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -138,7 +138,7 @@ TEST_CASE("Framework API - adaptive geo factory", "[framework][adaptive]") {
     auto [make_gambler, bet_fn] = adaptive_geo_factory();
 
     Vector32f samples = generate_binomial_samples(0.7f, 150);
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
+    auto [est, lb, ub, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -149,7 +149,7 @@ TEST_CASE("Framework API - adaptive seq factory", "[framework][adaptive]") {
     auto [make_gambler, bet_fn] = adaptive_seq_factory();
 
     Vector32f samples = generate_binomial_samples(0.3f, 150);
-    auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
+    auto [est, lb, ub, used] = bet_fn(samples, 0.5f, 0.1f, 100, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
     
     REQUIRE(est >= 0.0f);
     REQUIRE(est <= 1.0f);
@@ -164,7 +164,7 @@ TEST_CASE("Generic betting factory", "[framework]") {
         // by the betting function. It's kept for API compatibility.
         
         Vector32f samples = generate_binomial_samples(0.5f, 50);
-        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
+        auto [est, lb, ub, used] = bet_fn(samples, 0.5f, 0.1f, 50, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
 
         REQUIRE(est >= 0.0f);
         REQUIRE(est <= 1.0f);
@@ -175,7 +175,7 @@ TEST_CASE("Generic betting factory", "[framework]") {
         auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Vanilla, CapitalType::Seq);
         
         Vector32f samples = generate_binomial_samples(0.5f, 50);
-        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
+        auto [est, lb, ub, used] = bet_fn(samples, 0.5f, 0.1f, 50, {}, 0.05f, 0.5f, 0.25f, 1, 1000, Mode::Estimate);
 
         REQUIRE(est >= 0.0f);
         REQUIRE(est <= 1.0f);
@@ -186,7 +186,7 @@ TEST_CASE("Generic betting factory", "[framework]") {
         auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Ada, CapitalType::Geo);
 
         Vector32f samples = generate_binomial_samples(0.5f, 50);
-        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
+        auto [est, lb, ub, used] = bet_fn(samples, 0.5f, 0.1f, 50, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
 
         REQUIRE(est >= 0.0f);
         REQUIRE(est <= 1.0f);
@@ -197,7 +197,7 @@ TEST_CASE("Generic betting factory", "[framework]") {
         auto [make_gambler, bet_fn] = betting_factory(BetStrategy::Ada, CapitalType::Seq);
 
         Vector32f samples = generate_binomial_samples(0.5f, 50);
-        auto [est, used] = bet_fn(samples, 0.5f, 0.1f, 50, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
+        auto [est, lb, ub, used] = bet_fn(samples, 0.5f, 0.1f, 50, {}, 0.05f, 0.5f, 0.25f, 1, 100100, Mode::Estimate);
 
         REQUIRE(est >= 0.0f);
         REQUIRE(est <= 1.0f);
@@ -222,14 +222,14 @@ TEST_CASE("Betting strategies handle edge cases", "[strategy]") {
     Vector32f empty_samples(0);
     
     GeoCheckingCapital gambler1(0.05f, 0.5f, 100);
-    auto [est1, used1] = vanilla_betting(empty_samples, 0.5f, 0.1f, 100);
+    auto [est1, lb1, ub1, used1] = vanilla_betting(empty_samples, 0.5f, 0.1f, 100);
     REQUIRE(used1 == 0);
     
     // Single sample
     Vector32f single_sample(1);
     single_sample << 0.7f;
     
-    auto [est2, used2] = vanilla_betting(single_sample, 0.5f, 0.1f, 100);
+    auto [est2, lb2, ub2, used2] = vanilla_betting(single_sample, 0.5f, 0.1f, 100);
     REQUIRE(used2 == 1);
     REQUIRE(est2 >= 0.0f);
     REQUIRE(est2 <= 1.0f);
@@ -242,7 +242,7 @@ TEST_CASE("Strategies work with different priors", "[strategy]") {
     std::vector<Float32> priors = {0.3f, 0.5f, 0.7f};
     
     for (Float32 prior : priors) {
-        auto [est, used] = vanilla_betting(samples, prior, 0.1f, 100);
+        auto [est, lb, ub, used] = vanilla_betting(samples, prior, 0.1f, 100);
         
         // Should still estimate correctly regardless of prior
         REQUIRE(std::abs(est - true_mean) < 0.15f);
@@ -254,12 +254,12 @@ TEST_CASE("Adaptive vs Vanilla comparison", "[strategy][comparison]") {
     Vector32f samples = generate_binomial_samples(true_mean, 300);
     
     // Vanilla
-    auto [vanilla_est, vanilla_used] = vanilla_betting(
+    auto [vanilla_est, vlb, vub, vanilla_used] = vanilla_betting(
         samples, 0.5f, 0.1f, 100
     );
     
     // Adaptive
-    auto [adaptive_est, adaptive_used] = adaptive_betting(
+    auto [adaptive_est, alb, aub, adaptive_used] = adaptive_betting(
         samples, 0.5f, 0.1f, 100
     );
     
@@ -300,7 +300,7 @@ TEST_CASE("VanillaBetting class - incremental sample submission", "[class][vanil
     }
     
     // Finalize and check results
-    auto [est, used] = vb.finalize();
+    auto [est, lb, ub, used] = vb.finalize();
     REQUIRE(vb.is_finalized());
     REQUIRE(used > 0);
     REQUIRE(used <= total_samples);
@@ -322,7 +322,7 @@ TEST_CASE("VanillaBetting class - single sample submission", "[class][vanilla]")
         vb.submit_sample(samples(i));
     }
     
-    auto [est, used] = vb.finalize();
+    auto [est, lb, ub, used] = vb.finalize();
     REQUIRE(used > 0);
     REQUIRE(used <= num_samples);
     // With single sample submission, may terminate early; check estimate is valid
@@ -377,7 +377,7 @@ TEST_CASE("VanillaBetting class - reset functionality", "[class][vanilla]") {
         VanillaBetting<GeoCheckingCapital> vb2(0.5f, 0.1f, 100);
         
         vb2.submit_samples(samples2);
-        auto [est, used] = vb2.finalize();
+        auto [est, lb, ub, used] = vb2.finalize();
         REQUIRE(used > 0);
         REQUIRE(std::abs(est - 0.4f) < 0.15f);
     }
@@ -437,7 +437,7 @@ TEST_CASE("AdaptiveBetting class - incremental sample submission", "[class][adap
     }
     
     // Finalize and check results
-    auto [est, used] = ab.finalize();
+    auto [est, lb, ub, used] = ab.finalize();
     REQUIRE(ab.is_finalized());
     REQUIRE(used > 0);
     REQUIRE(used <= total_samples);
@@ -459,7 +459,7 @@ TEST_CASE("AdaptiveBetting class - single sample submission", "[class][adaptive]
         ab.submit_sample(samples(i));
     }
     
-    auto [est, used] = ab.finalize();
+    auto [est, lb, ub, used] = ab.finalize();
     REQUIRE(used > 0);
     REQUIRE(used <= num_samples);
     // Relaxed tolerance for single-sample submission (less efficient)
@@ -540,7 +540,7 @@ TEST_CASE("AdaptiveBetting class - reset functionality", "[class][adaptive]") {
         AdaptiveBetting<GeoCheckingCapital> ab2(0.5f, 0.08f, 100);
         
         ab2.submit_samples(samples2);
-        auto [est, used] = ab2.finalize();
+        auto [est, lb, ub, used] = ab2.finalize();
         REQUIRE(used > 0);
         REQUIRE(std::abs(est - 0.4f) < 0.15f);
     }
@@ -592,7 +592,7 @@ TEST_CASE("VanillaBetting with SequenceCheckingCapital class", "[class][vanilla]
     VanillaBetting<SequenceCheckingCapital> vb(0.5f, 0.1f, 100);
     
     vb.submit_samples(samples);
-    auto [est, used] = vb.finalize();
+    auto [est, lb, ub, used] = vb.finalize();
     
     REQUIRE(used > 0);
     REQUIRE(used <= 150);
@@ -606,7 +606,7 @@ TEST_CASE("AdaptiveBetting with SequenceCheckingCapital class", "[class][adaptiv
     AdaptiveBetting<SequenceCheckingCapital> ab(0.5f, 0.08f, 100);
     
     ab.submit_samples(samples);
-    auto [est, used] = ab.finalize();
+    auto [est, lb, ub, used] = ab.finalize();
     
     REQUIRE(used > 0);
     REQUIRE(used <= 150);

@@ -63,7 +63,7 @@ void run_experiment(const std::string& name,
     // Run betting strategy
     auto start_time = std::chrono::high_resolution_clock::now();
     // Call updated bet_fn signature: add breakpoints, gambler params, and mode
-    auto [estimated_mean, samples_used] = bet_fn(samples, prior_mean, delta, grid_num,
+    auto [estimated_mean, _, __, samples_used] = bet_fn(samples, prior_mean, delta, grid_num,
                                                 std::vector<Int32>{}, // breakpoints
                                                 alpha,                 // gambler_alpha
                                                 trunc_scale,           // gambler_trunc_scale
@@ -191,7 +191,7 @@ int main() {
         }
         
         // Run on accumulated samples
-        auto [est, used] = bet_fn(samples.head(end_idx), prior_mean, delta, grid_num,
+        auto [est, _, __, used] = bet_fn(samples.head(end_idx), prior_mean, delta, grid_num,
                      std::vector<Int32>{}, // breakpoints
                      alpha,                 // gambler_alpha
                      trunc_scale,           // gambler_trunc_scale

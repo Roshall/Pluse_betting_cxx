@@ -58,13 +58,22 @@ int main() {
     // Run vanilla betting strategy
     constexpr Float32 prior_mean = 0.5f;
     constexpr Float32 delta = 0.05f;
+    constexpr Float32 gambler_alpha = 0.05f;
+    constexpr Float32 gambler_trunc_scale = 0.5f;
+    constexpr Float32 gambler_prior_var = 0.25f;
+    constexpr Int32 gambler_num = 1;
+    constexpr Int32 gambler_sample_num = 100010;
     
     std::cout << "\nRunning vanilla betting strategy..." << std::endl;
-    auto [estimated_mean, samples_used] = bet_fn(samples, prior_mean, delta, grid_num, gambler);
+    auto [estimated_mean, lb, ub, samples_used] = bet_fn(samples, prior_mean, delta, grid_num, {}, 
+                                                          gambler_alpha, gambler_trunc_scale, 
+                                                          gambler_prior_var, gambler_num, 
+                                                          gambler_sample_num, Mode::Estimate);
     
     std::cout << "\nResults:" << std::endl;
     std::cout << "  True mean: " << true_mean << std::endl;
     std::cout << "  Estimated mean: " << estimated_mean << std::endl;
+    std::cout << "  Confidence interval: [" << lb << ", " << ub << "]" << std::endl;
     std::cout << "  Error: " << std::abs(estimated_mean - true_mean) << std::endl;
     std::cout << "  Samples used: " << samples_used << " / " << num_samples << std::endl;
     std::cout << "  Efficiency: " << (100.0f * samples_used / num_samples) << "%" << std::endl;
