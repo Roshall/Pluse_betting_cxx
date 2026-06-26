@@ -12,6 +12,8 @@ if(NOT TARGET benchmark::benchmark)
       GIT_TAG v1.8.3
     )
     FetchContent_MakeAvailable(google_benchmark)
+    target_compile_options(benchmark PUBLIC -Wno-c2y-extensions)
+    target_compile_options(benchmark_main PUBLIC -Wno-c2y-extensions)
 endif()
 
 add_executable(betting_benchmarks
