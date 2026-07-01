@@ -100,6 +100,9 @@ public:
             case Phase::BoundsRefinement:
                 process_bounds_refinement();
                 break;
+            case Phase::BoundsTightening:
+                process_bounds_tightening();
+                break;
             case Phase::FinalEstimation:
                 process_final_estimation(); 
                 break;
@@ -185,6 +188,7 @@ private:
     enum class Phase {
         DirectionDetection,
         BoundsRefinement,
+        BoundsTightening,
         FinalEstimation
     };
 
@@ -485,9 +489,50 @@ private:
      * @brief Process bounds refinement phase (state 2).
      */
     void process_bounds_refinement() {
-        if (process_bounds_refinement_dir(s2_is_up_) && mode_ == Mode::Estimate) {
-            phase_ = Phase::FinalEstimation;
-            process_final_estimation();
+        if (process_bounds_refinement_dir(s2_is_up_)) {
+            if (mode_ == Mode::Estimate) {
+                phase_ = Phase::FinalEstimation;
+                process_final_estimation();
+            } else {
+                phase_ = Phase::BoundsTightening;
+                process_bounds_tightening();
+            }
+        }
+    }
+
+    /**
+     * @brief Process bounds tightening phase (Mode::Bound only).
+     * 
+     * Tightens both lower and upper bounds independently toward the true mean
+     * by rejecting hypotheses one grid stride at a time. Each successful
+     * rejection allows the bound to move inward, shrinking the confidence
+     * interval while maintaining statistical guarantees.
+     */
+    void process_bounds_tightening() {
+        // Tighten lower bound upward (reject hypotheses below the true mean)
+        while (l_ + stride_ < u_ - stride_) {
+            Float32 next_l = l_ + stride_;
+            Int32 next_li = static_cast<Int32>(std::round(next_l * grid_num_));
+            next_li = std::max(0, std::min(next_li, grid_num_));
+            if (bet_on(gambler_, next_l, next_li, 0)) {
+                l_ = next_l;
+                li_ = next_li;
+            } else {
+                break;
+            }
+        }
+
+        // Tighten upper bound downward (reject hypotheses above the true mean)
+        while (u_ - stride_ > l_ + stride_) {
+            Float32 next_u = u_ - stride_;
+            Int32 next_ui = static_cast<Int32>(std::round(next_u * grid_num_));
+            next_ui = std::max(0, std::min(next_ui, grid_num_));
+            if (bet_on(gambler_, next_u, next_ui, 1)) {
+                u_ = next_u;
+                ui_ = next_ui;
+            } else {
+                break;
+            }
         }
     }
 
