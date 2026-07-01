@@ -259,8 +259,10 @@ private:
             while (l_ >= 0.0f) {
                 l_ -= width;
                 li_ -= w_stride;
-                if (!bet_on(gambler_, l_, li_, 1)) {
-                    if (!bet_on(gambler_, l_, li_, 0)) {
+                // Clamp li_ to valid range before calling bet_on
+                Int32 li_clamped = std::max(0, std::min(li_, grid_num_));
+                if (!bet_on(gambler_, l_, li_clamped, 1)) {
+                    if (!bet_on(gambler_, l_, li_clamped, 0)) {
                         touch_ = Touch::Upper;
                     }
                     break;
@@ -270,14 +272,17 @@ private:
                 l_ = 0.0f;
             }
             u_ = std::min(l_ + width, 1.0f);
+            li_ = std::max(0, std::min(li_, grid_num_));
         } else {
             // Both below the mean, slide up
             ui_ = static_cast<Int32>(std::round(u_ * grid_num_));
             while (u_ <= 1.0f) {
                 u_ += width;
                 ui_ += w_stride;
-                if (!bet_on(gambler_, u_, ui_, 0)) {
-                    if (!bet_on(gambler_, u_, ui_, 1)) {
+                // Clamp ui_ to valid range before calling bet_on
+                Int32 ui_clamped = std::max(0, std::min(ui_, grid_num_));
+                if (!bet_on(gambler_, u_, ui_clamped, 0)) {
+                    if (!bet_on(gambler_, u_, ui_clamped, 1)) {
                         touch_ = Touch::Lower;
                     }
                     break;
@@ -287,6 +292,7 @@ private:
                 u_ = 1.0f;
             }
             l_ = std::max(u_ - width, 0.0f);
+            ui_ = std::max(0, std::min(ui_, grid_num_));
         }
     }
 
@@ -393,7 +399,11 @@ private:
         Float32& bound = refine_up ? l_ : u_;
         Int32 mi = static_cast<Int32>(std::round(bound * grid_num_));
         
-        while ((refine_up ? bound < 1.0f - win_ : bound > win_) && bet_on(gambler_, bound, mi, twin_idx)) {
+        while ((refine_up ? bound < 1.0f - win_ : bound > win_)) {
+            Int32 mi_clamped = std::max(0, std::min(mi, grid_num_));
+            if (!bet_on(gambler_, bound, mi_clamped, twin_idx)) {
+                break;
+            }
             if (refine_up) {
                 bound += stride_;
                 mi += 1;
@@ -427,7 +437,8 @@ private:
         if (slide_up) {
             ui_ = static_cast<Int32>(std::round(u_ / stride_));
             while (u_ <= 1.0f) {
-                if (!bet_on(gambler_, u_, ui_, twin_idx)) {
+                Int32 ui_clamped = std::max(0, std::min(ui_, grid_num_));
+                if (!bet_on(gambler_, u_, ui_clamped, twin_idx)) {
                     l_ = std::max(u_ - win_, 0.0f);
                     break;
                 }
@@ -437,14 +448,19 @@ private:
             if (u_ >= 1.0f) {
                 u_ = 1.0f;
                 l_ = std::max(u_ - width, 0.0f);
+                ui_ = std::max(0, std::min(ui_, grid_num_));
                 return true;
             }
+            ui_ = std::max(0, std::min(ui_, grid_num_));
             refine_bound_sequentially(true);
-            return u_ == 1.0f || bet_on(gambler_, u_, static_cast<Int32>(std::round(u_ * grid_num_)), 1);
+            Int32 u_rounded = static_cast<Int32>(std::round(u_ * grid_num_));
+            u_rounded = std::max(0, std::min(u_rounded, grid_num_));
+            return u_ == 1.0f || bet_on(gambler_, u_, u_rounded, 1);
         } else {
             li_ = static_cast<Int32>(std::round(l_ / stride_));
             while (l_ >= 0.0f) {
-                if (!bet_on(gambler_, l_, li_, twin_idx)) {
+                Int32 li_clamped = std::max(0, std::min(li_, grid_num_));
+                if (!bet_on(gambler_, l_, li_clamped, twin_idx)) {
                     u_ = std::min(l_ + win_, 1.0f);
                     break;
                 }
@@ -454,10 +470,14 @@ private:
             if (l_ <= 0.0f) {
                 l_ = 0.0f;
                 u_ = std::min(l_ + width, 1.0f);
+                li_ = std::max(0, std::min(li_, grid_num_));
                 return true;
             } 
+            li_ = std::max(0, std::min(li_, grid_num_));
             refine_bound_sequentially(false);
-            return l_ == 0.0f || bet_on(gambler_, l_, static_cast<Int32>(std::round(l_ * grid_num_)), 0);
+            Int32 l_rounded = static_cast<Int32>(std::round(l_ * grid_num_));
+            l_rounded = std::max(0, std::min(l_rounded, grid_num_));
+            return l_ == 0.0f || bet_on(gambler_, l_, l_rounded, 0);
         }
     }
 
