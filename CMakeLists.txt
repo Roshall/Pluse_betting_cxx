@@ -94,14 +94,6 @@ if(BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-if(BUILD_BENCHMARKS)
-    add_subdirectory(benchmarks)
-endif()
-
-if(BUILD_EXAMPLES)
-    add_subdirectory(examples)
-endif()
-
 # Installation configuration
 # Skip installation when building from root selva project (SELVA_ROOT_BUILD is set)
 if(NOT DEFINED SELVA_ROOT_BUILD)
