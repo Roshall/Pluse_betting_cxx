@@ -157,7 +157,7 @@ public:
             phase_ = Phase::FinalEstimation;
             process_final_estimation();
         }
-        return std::make_tuple(estimated_mean_, l_, u_, gambler_.s_ptr());
+        return std::make_tuple(estimated_mean_, l_, u_, get_samples_used());
     }
 
     /**
