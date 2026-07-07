@@ -36,6 +36,7 @@ if(NOT TARGET Eigen3::Eigen)
       GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
       GIT_TAG 5.0.0
     )
+    set(EIGEN_BUILD_CMAKE_PACKAGE ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(eigen)
 endif()
 
@@ -118,14 +119,6 @@ if(NOT DEFINED SELVA_ROOT_BUILD)
         FILE betting_by_timeTargets.cmake
         NAMESPACE betting_by_time::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/betting_by_time
-    )
-
-    # Export Eigen dependency
-    install(TARGETS eigen EXPORT eigenTargets)
-    install(EXPORT eigenTargets
-        FILE eigenTargets.cmake
-        NAMESPACE Eigen3::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/eigen
     )
 
     # Generate and install package config file
