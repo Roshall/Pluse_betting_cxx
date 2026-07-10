@@ -153,20 +153,23 @@ public:
             
             // Update positive twin (bet on mean > m)
             Float64& cum_capital_pos = cum_cap_twins_(mi, 0);
-            if (std::abs(cum_capital_pos) > 1e-16) {
-                Float32 lbd_m = std::clamp(lbd,
+            const auto cum_cap_pos_abs = std::abs(cum_capital_pos);
+            // Only update if capital is within reasonable bounds to avoid numerical issues
+            if (cum_cap_pos_abs > 1e-16 && cum_cap_pos_abs < 1e16) {
+                Float64 lbd_m = std::clamp(lbd,
                                           -trunc_scale_ / (1.0f + 1e-9f - m),
                                           trunc_scale_ / (m + 1e-9f));
-                cum_capital_pos *= 1.0 + static_cast<Float64>(lbd_m) * static_cast<Float64>(x - m);
+                cum_capital_pos *= 1.0 + lbd_m * static_cast<Float64>(x - m);
             }
             
             // Update negative twin (bet on mean < m)
             Float64& cum_capital_neg = cum_cap_twins_(mi, 1);
-            if (std::abs(cum_capital_neg) > 1e-16) {
-                Float32 lbd_m = std::clamp(-lbd,
+            const auto cum_cap_neg_abs = std::abs(cum_capital_neg);
+            if (cum_cap_neg_abs > 1e-16 && cum_cap_neg_abs < 1e16) {
+                Float64 lbd_m = std::clamp(-lbd,
                                           -trunc_scale_ / (1.0f + 1e-9f - m),
                                           trunc_scale_ / (m + 1e-9f));
-                cum_capital_neg *= 1.0 + static_cast<Float64>(lbd_m) * static_cast<Float64>(x - m);
+                cum_capital_neg *= 1.0 + lbd_m * static_cast<Float64>(x - m);
             }
         }
     }

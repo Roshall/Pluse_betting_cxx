@@ -5,7 +5,7 @@ namespace betting {
 Float64 geo_single_bet_on(Float32 trunc_scale, Float32 m, 
                           const Vector32f& samples,
                           Float64 cum_cap, Float32 capital) {
-    if (cum_cap < 1e-16) return cum_cap;
+    if ((cum_cap < 1e-16) || (cum_cap > 1e16)) return cum_cap;
     
     const auto m_f64 = static_cast<Float64>(m);
     const Float64 lower_bound =
@@ -26,8 +26,9 @@ Float64 seq_single_bet_on(Float32 trunc_scale, Float32 m,
                           Float64 cum_cap, Float32 capital) {
     const auto sample_f64 = static_cast<Float64>(sample);
     const auto m_f64 = static_cast<Float64>(m);
+    const auto abs_cum_cap = std::abs(cum_cap);
 
-    if (std::abs(sample_f64 - m_f64) < 1e-9 || std::abs(cum_cap) < 1e-16) {
+    if ((std::abs(sample_f64 - m_f64) < 1e-9) || (abs_cum_cap < 1e-16) || (abs_cum_cap > 1e16)) {
         return cum_cap;
     }
 
@@ -38,6 +39,7 @@ Float64 seq_single_bet_on(Float32 trunc_scale, Float32 m,
     const auto lbd_m = std::clamp(static_cast<Float64>(capital),
                                   lower_bound,
                                   upper_bound);
+    assert (lbd_m * (sample_f64 - m_f64) > -1.0 && "Earnings factor should be non-negative");
 
     return cum_cap * (1.0 + lbd_m * (sample_f64 - m_f64));
 }
