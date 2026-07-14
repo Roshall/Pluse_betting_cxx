@@ -17,12 +17,12 @@ namespace betting {
  */
 class TimeSliceOptLambda {
 private:
-    Float32 cum_;           ///< Cumulative sum of samples
-    Float32 cum_diff2_;     ///< Cumulative sum of squared differences
-    Float32 c_;             ///< Confidence constant (depends on alpha)
-    Float32 lbd_cum_;       ///< Cumulative lambda
-    Float32 lbd2_cum_;      ///< Cumulative lambda squared
-    Float32 t_;               ///< Time step counter
+    Float64 cum_;           ///< Cumulative sum of samples
+    Float64 cum_diff2_;     ///< Cumulative sum of squared differences
+    Float64 c_;             ///< Confidence constant (depends on alpha)
+    Float64 lbd_cum_;       ///< Cumulative lambda
+    Float64 lbd2_cum_;      ///< Cumulative lambda squared
+    Float64 t_;               ///< Time step counter
 
 public:
     /**
@@ -53,7 +53,7 @@ public:
      */
     void reset(Float32 prior_mean, Float32 prior_var, Float32 num) {
         cum_diff2_ = prior_var * num;
-        const Float32 lbd = std::sqrt(c_ / cum_diff2_);
+        const Float64 lbd = std::sqrt(c_ / cum_diff2_);
         lbd_cum_ = lbd * num;
         lbd2_cum_ = lbd_cum_ * lbd;
         t_ = num - 1;
@@ -78,20 +78,20 @@ public:
      */
     Float32 advance(const Float32* samples, Float32 n) {
         t_ += n;
-        const Float32 t = t_;
+        const Float64 t = t_;
         
         // Update cumulative statistics using Eigen
         Eigen::Map<const Eigen::VectorXf> sample_vec(samples, static_cast<Int32>(n));
         cum_ += sample_vec.sum();
         
         // Update cumulative squared differences using Eigen
-        const Eigen::VectorXf centered = sample_vec.array() - cum_ / t;
+        const Eigen::VectorXd centered = sample_vec.cast<Float64>().array() - cum_ / t;
         cum_diff2_ += centered.squaredNorm();
         
         // Compute optimal lambda
-        const Float32 sigma2 = cum_diff2_ / t;
-        const Float32 a = sigma2 * lbd2_cum_ + c_;
-        const Float32 b = lbd_cum_ / n;
+        const Float64 sigma2 = cum_diff2_ / t;
+        const Float64 a = sigma2 * lbd2_cum_ + c_;
+        const Float64 b = lbd_cum_ / n;
         
         // lambda* formula from the paper
         const Float32 lbd = std::sqrt(b * b + a / (sigma2 * n)) - b;

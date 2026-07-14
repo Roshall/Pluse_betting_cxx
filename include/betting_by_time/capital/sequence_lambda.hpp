@@ -16,12 +16,12 @@ namespace betting {
  */
 class Lambda {
 private:
-    Float32 cum_;           ///< Cumulative sum of samples
-    Float32 cum_diff2_;     ///< Cumulative sum of squared differences
-    Float32 t_;               ///< Current time step
-    Float32 alpha_;         ///< Confidence parameter
-    Float32 c_;             ///< Confidence constant c = 2*ln(2/alpha)
-    Float32 fake_;            ///< Fake time offset
+    Float64 cum_;           ///< Cumulative sum of samples
+    Float64 cum_diff2_;     ///< Cumulative sum of squared differences
+    Float64 t_;               ///< Current time step
+    Float64 alpha_;         ///< Confidence parameter
+    Float64 c_;             ///< Confidence constant c = 2*ln(2/alpha)
+    Float64 fake_;            ///< Fake time offset
 
 public:
     /**
@@ -73,9 +73,9 @@ public:
      * @return Computed lambda value
      */
     Float32 advance(Float32 x) {
-        const Float32 t = t_++;
-        const Float32 sigma2 = cum_diff2_ / t;
-        const Float32 ft = t - fake_;
+        const Float64 t = t_++;
+        const Float64 sigma2 = cum_diff2_ / t;
+        const Float64 ft = t - fake_;
         
         // Lambda formula with logarithmic confidence bound
         const Float32 lbd = std::sqrt(c_ / (sigma2 * ft * std::log(ft + 1)));
